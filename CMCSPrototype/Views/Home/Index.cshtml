@@ -1,0 +1,33 @@
+﻿@model CMCSPrototype.Models.DashboardViewModel;
+<div class="text-center">
+    <h1>Welcome to CMCS</h1>
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <i class="fas fa-clock fa-2x text-primary"></i>
+                    <h5>Pending Claims</h5>
+                    <p>@Model.PendingClaims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <i class="fas fa-dollar-sign fa-2x text-success"></i>
+                    <h5>Total Claimed</h5>
+                    <p>R@Model.TotalClaimed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <i class="fas fa-check-circle fa-2x text-info"></i>
+                    <h5>Approved Claims</h5>
+                    <p>@Model.ApprovedClaims</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

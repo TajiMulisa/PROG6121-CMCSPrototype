@@ -1,0 +1,16 @@
+﻿@model IEnumerable<CMCSPrototype.Models.Claim>
+<div class="card">
+    <div class="card-header"><i class="fas fa-chart-line"></i> Track Status</div>
+    <div class="card-body">
+        <form method="get">
+            <input name="lecturerName" placeholder="Enter Lecturer Name" class="form-control mb-3" />
+            <button class="btn btn-primary">Search</button>
+        </form>
+        @foreach (var claim in Model)
+        {
+            <div class="progress mb-3">
+                <div class="progress-bar @(claim.Status == ClaimStatus.Approved ? "bg-success" : claim.Status == ClaimStatus.Rejected ? "bg-danger" : "bg-warning")" style="width: @(claim.Status == ClaimStatus.Pending ? "50%" : "100%")">@claim.Status</div>
+            </div>
+        }
+    </div>
+</div>

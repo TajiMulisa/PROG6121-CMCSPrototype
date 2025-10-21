@@ -1,0 +1,28 @@
+﻿@model IEnumerable<CMCSPrototype.Models.Claim>
+<div class="card">
+    <div class="card-header"><i class="fas fa-check"></i> Approve Claims</div>
+    <div class="card-body">
+        @if (!Model.Any())
+        {
+            <p>No pending claims.</p>
+        }
+        else
+        {
+            foreach (var claim in Model)
+            {
+                <div class="border p-3 mb-3">
+                    <p><strong>@claim.LecturerName</strong> - Hours: @claim.HoursWorked, Rate: R@claim.HourlyRate, Total: R@((decimal)claim.HoursWorked * claim.HourlyRate)</p>
+                    <p>Notes: @claim.Notes</p>
+                    <form asp-action="Approve" method="post" class="d-inline">
+                        <input type="hidden" name="id" value="@claim.Id" />
+                        <button class="btn btn-success"><i class="fas fa-thumbs-up"></i> Approve</button>
+                    </form>
+                    <form asp-action="Reject" method="post" class="d-inline">
+                        <input type="hidden" name="id" value="@claim.Id" />
+                        <button class="btn btn-danger"><i class="fas fa-thumbs-down"></i> Reject</button>
+                    </form>
+                </div>
+            }
+        }
+    </div>
+</div>
