@@ -7,5 +7,6 @@ namespace CMCSPrototype.Data
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         public DbSet<Claim> Claims { get; set; }
         public DbSet<Document> Documents { get; set; }
+        public DbSet<User> Users { get; set; }
     }
 }

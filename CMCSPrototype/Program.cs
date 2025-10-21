@@ -17,8 +17,18 @@ namespace CMCSPrototype
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase("CMCS"));
 
-            // Register ClaimService with interface
+            // Register services
             builder.Services.AddScoped<IClaimService, ClaimService>();
+            builder.Services.AddScoped<IAuthService, AuthService>();
+
+            // Add session support
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession(options =>
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(30);
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+            });
 
             var app = builder.Build();
 
@@ -30,6 +40,7 @@ namespace CMCSPrototype
 
             app.UseStaticFiles();
             app.UseRouting();
+            app.UseSession();
             app.UseAuthorization();
 
             app.MapControllerRoute(
