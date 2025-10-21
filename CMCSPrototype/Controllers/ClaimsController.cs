@@ -35,6 +35,44 @@ namespace CMCSPrototype.Controllers
         {
             return View();
         }
+        
+        [HttpPost]
+        public async Task<IActionResult> UploadDocuments(int claimId, List<IFormFile> documents)
+        {
+            if (documents == null || !documents.Any())
+            {
+                TempData["Error"] = "Please select at least one document to upload.";
+                return RedirectToAction("UploadDocuments");
+            }
+            
+            var successCount = 0;
+            var errorMessages = new List<string>();
+            
+            foreach (var document in documents)
+            {
+                try
+                {
+                    await HandleFileUpload(document, claimId);
+                    successCount++;
+                }
+                catch (Exception ex)
+                {
+                    errorMessages.Add($"{document.FileName}: {ex.Message}");
+                }
+            }
+            
+            if (successCount > 0)
+            {
+                TempData["Success"] = $"{successCount} document(s) uploaded successfully.";
+            }
+            
+            if (errorMessages.Any())
+            {
+                TempData["Error"] = string.Join("; ", errorMessages);
+            }
+            
+            return RedirectToAction("TrackStatus");
+        }
 
         // Claim Status Tracking Page
         public IActionResult TrackStatus()
@@ -47,9 +85,26 @@ namespace CMCSPrototype.Controllers
         {
             if (ModelState.IsValid)
             {
+                claim.SubmissionDate = DateTime.Now;
                 await _claimService.SubmitClaim(claim);
-                if (document != null) await HandleFileUpload(document, claim.Id);
-                TempData["Message"] = "Claim submitted successfully!";
+                
+                if (document != null)
+                {
+                    try
+                    {
+                        await HandleFileUpload(document, claim.Id);
+                        TempData["Success"] = "Claim submitted successfully with document!";
+                    }
+                    catch (Exception ex)
+                    {
+                        TempData["Error"] = $"Claim submitted but file upload failed: {ex.Message}";
+                    }
+                }
+                else
+                {
+                    TempData["Success"] = "Claim submitted successfully!";
+                }
+                
                 return RedirectToAction("TrackStatus");
             }
             return View(claim);
@@ -78,13 +133,67 @@ namespace CMCSPrototype.Controllers
 
         private async Task HandleFileUpload(IFormFile file, int claimId)
         {
-            if (file.Length > 5 * 1024 * 1024) throw new Exception("File too large.");
-            var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
-            if (!allowedTypes.Contains(file.ContentType)) throw new Exception("Invalid file type.");
-            var path = Path.Combine("wwwroot/uploads", Guid.NewGuid() + Path.GetExtension(file.FileName));
-            using (var stream = new FileStream(path, FileMode.Create)) { await file.CopyToAsync(stream); }
-            var doc = new Document { FileName = file.FileName, FilePath = path, ClaimId = claimId };
-            await _claimService.AddDocument(doc);
+            // Validate file size (max 5MB)
+            const long maxFileSize = 5 * 1024 * 1024;
+            if (file.Length > maxFileSize)
+            {
+                throw new Exception("File size exceeds 5MB limit.");
+            }
+            
+            // Validate file type
+            var allowedTypes = new[] 
+            { 
+                "application/pdf", 
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+                "application/msword", // .doc
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+                "application/vnd.ms-excel", // .xls
+                "image/jpeg",
+                "image/png"
+            };
+            
+            if (!allowedTypes.Contains(file.ContentType))
+            {
+                throw new Exception("Invalid file type. Allowed types: PDF, Word, Excel, JPEG, PNG");
+            }
+            
+            // Validate file extension
+            var allowedExtensions = new[] { ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".jpg", ".jpeg", ".png" };
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                throw new Exception("Invalid file extension.");
+            }
+            
+            // Create uploads directory if it doesn't exist
+            var uploadsFolder = Path.Combine("wwwroot", "uploads");
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+            
+            // Generate unique filename
+            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+            
+            // Save file to disk
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+            
+            // Create document record
+            var document = new Document
+            {
+                FileName = file.FileName,
+                FilePath = filePath,
+                ClaimId = claimId,
+                FileSize = file.Length,
+                ContentType = file.ContentType,
+                UploadedAt = DateTime.Now
+            };
+            
+            await _claimService.AddDocument(document);
         }
 
         public async Task<IActionResult> TrackStatus(string lecturerName)
