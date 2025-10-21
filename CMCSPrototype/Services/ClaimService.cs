@@ -21,10 +21,11 @@ namespace CMCSPrototype.Services
             return await _context.Claims.Where(c => c.Status == ClaimStatus.Pending).ToListAsync();
         }
         // Get a specific claim by ID (including documents)
-        public async Task<Claim> GetClaimById(int id)
+        public async Task<Claim?> GetClaimById(int id)
         {
             return await _context.Claims.Include(c => c.Documents).FirstOrDefaultAsync(c => c.Id == id);
         }
+        
         // Submit a new claim with automated verification
         public async Task SubmitClaim(Claim claim)
         {
@@ -90,25 +91,53 @@ namespace CMCSPrototype.Services
                     "Claims older than 3 months cannot be submitted. Please contact administration for assistance.");
             }
         }
-        // Approve a claim
-        public async Task ApproveClaim(int id)
+        // Approve a claim with tracking
+        public async Task ApproveClaim(int id, string approverName, string comments)
         {
             var claim = await GetClaimById(id);
-            if (claim != null)
+            if (claim == null)
             {
-                claim.Status = ClaimStatus.Approved;
-                await _context.SaveChangesAsync();
+                throw new InvalidOperationException($"Claim with ID {id} not found.");
             }
+            
+            if (claim.Status != ClaimStatus.Pending)
+            {
+                throw new InvalidOperationException($"Only pending claims can be approved. Current status: {claim.Status}");
+            }
+            
+            claim.Status = ClaimStatus.Approved;
+            claim.ApprovedBy = approverName;
+            claim.ApprovedAt = DateTime.Now;
+            claim.ApprovalComments = comments;
+            
+            await _context.SaveChangesAsync();
         }
-        // Reject a claim
-        public async Task RejectClaim(int id)
+        
+        // Reject a claim with tracking
+        public async Task RejectClaim(int id, string rejectorName, string reason)
         {
             var claim = await GetClaimById(id);
-            if (claim != null)
+            if (claim == null)
             {
-                claim.Status = ClaimStatus.Rejected;
-                await _context.SaveChangesAsync();
+                throw new InvalidOperationException($"Claim with ID {id} not found.");
             }
+            
+            if (claim.Status != ClaimStatus.Pending)
+            {
+                throw new InvalidOperationException($"Only pending claims can be rejected. Current status: {claim.Status}");
+            }
+            
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new InvalidOperationException("Rejection reason is required.");
+            }
+            
+            claim.Status = ClaimStatus.Rejected;
+            claim.RejectedBy = rejectorName;
+            claim.RejectedAt = DateTime.Now;
+            claim.RejectionReason = reason;
+            
+            await _context.SaveChangesAsync();
         }
         // Add a document to a claim
         public async Task AddDocument(Document doc)

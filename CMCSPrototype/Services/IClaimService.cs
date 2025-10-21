@@ -9,11 +9,12 @@ namespace CMCSPrototype.Services
     {
         Task SubmitClaim(Claim claim);
         Task<List<Claim>> GetPendingClaims();
-        Task ApproveClaim(int id);
-        Task RejectClaim(int id);
+        Task ApproveClaim(int id, string approverName, string comments);
+        Task RejectClaim(int id, string rejectorName, string reason);
         Task AddDocument(Document doc);
         DashboardViewModel GetDashboardStats();
         Task<bool> HasClaimForMonth(string lecturerName, DateTime month);
         Task<List<Claim>> GetClaimsByLecturer(string lecturerName);
+        Task<Claim?> GetClaimById(int id);
     }
 }

@@ -30,6 +30,23 @@ namespace CMCSPrototype.Models
         
         public DateTime SubmittedAt { get; set; } = DateTime.Now;
         
+        // Approval/Rejection tracking fields
+        [StringLength(100)]
+        public string? ApprovedBy { get; set; }
+        
+        public DateTime? ApprovedAt { get; set; }
+        
+        [StringLength(1000, ErrorMessage = "Approval comments cannot exceed 1000 characters")]
+        public string? ApprovalComments { get; set; }
+        
+        [StringLength(100)]
+        public string? RejectedBy { get; set; }
+        
+        public DateTime? RejectedAt { get; set; }
+        
+        [StringLength(1000, ErrorMessage = "Rejection reason cannot exceed 1000 characters")]
+        public string? RejectionReason { get; set; }
+        
         public List<Document> Documents { get; set; } = new List<Document>();
         
         // Calculated property for total amount

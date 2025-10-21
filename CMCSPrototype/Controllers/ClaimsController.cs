@@ -132,17 +132,81 @@ namespace CMCSPrototype.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Approve(int id)
+        public async Task<IActionResult> Approve(int id, string approverName, string comments)
         {
-            await _claimService.ApproveClaim(id);
+            try
+            {
+                if (string.IsNullOrWhiteSpace(approverName))
+                {
+                    TempData["Error"] = "Approver name is required.";
+                    return RedirectToAction("GetApproveClaims");
+                }
+                
+                await _claimService.ApproveClaim(id, approverName, comments ?? "Approved");
+                TempData["Success"] = "Claim approved successfully!";
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error approving claim: {ex.Message}";
+            }
+            
             return RedirectToAction("GetApproveClaims");
         }
 
         [HttpPost]
-        public async Task<IActionResult> Reject(int id)
+        public async Task<IActionResult> Reject(int id, string rejectorName, string reason)
         {
-            await _claimService.RejectClaim(id);
+            try
+            {
+                if (string.IsNullOrWhiteSpace(rejectorName))
+                {
+                    TempData["Error"] = "Rejector name is required.";
+                    return RedirectToAction("GetApproveClaims");
+                }
+                
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    TempData["Error"] = "Rejection reason is required.";
+                    return RedirectToAction("GetApproveClaims");
+                }
+                
+                await _claimService.RejectClaim(id, rejectorName, reason);
+                TempData["Success"] = "Claim rejected successfully!";
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = ex.Message;
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error rejecting claim: {ex.Message}";
+            }
+            
             return RedirectToAction("GetApproveClaims");
+        }
+        
+        [HttpGet]
+        public async Task<IActionResult> ClaimDetails(int id)
+        {
+            try
+            {
+                var claim = await _claimService.GetClaimById(id);
+                if (claim == null)
+                {
+                    TempData["Error"] = "Claim not found.";
+                    return RedirectToAction("GetApproveClaims");
+                }
+                return View(claim);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error loading claim details: {ex.Message}";
+                return RedirectToAction("GetApproveClaims");
+            }
         }
 
         private async Task HandleFileUpload(IFormFile file, int claimId)
