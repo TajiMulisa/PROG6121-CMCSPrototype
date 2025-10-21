@@ -85,27 +85,41 @@ namespace CMCSPrototype.Controllers
         {
             if (ModelState.IsValid)
             {
-                claim.SubmissionDate = DateTime.Now;
-                await _claimService.SubmitClaim(claim);
-                
-                if (document != null)
+                try
                 {
-                    try
+                    claim.SubmissionDate = DateTime.Now;
+                    await _claimService.SubmitClaim(claim);
+                    
+                    if (document != null)
                     {
-                        await HandleFileUpload(document, claim.Id);
-                        TempData["Success"] = "Claim submitted successfully with document!";
+                        try
+                        {
+                            await HandleFileUpload(document, claim.Id);
+                            TempData["Success"] = "Claim submitted successfully with document!";
+                        }
+                        catch (Exception ex)
+                        {
+                            TempData["Warning"] = $"Claim submitted but file upload failed: {ex.Message}";
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        TempData["Error"] = $"Claim submitted but file upload failed: {ex.Message}";
+                        TempData["Success"] = "Claim submitted successfully! Automated verification passed.";
                     }
+                    
+                    return RedirectToAction("TrackStatus");
                 }
-                else
+                catch (InvalidOperationException ex)
                 {
-                    TempData["Success"] = "Claim submitted successfully!";
+                    // Validation errors from automated verification
+                    ModelState.AddModelError(string.Empty, ex.Message);
+                    TempData["Error"] = ex.Message;
                 }
-                
-                return RedirectToAction("TrackStatus");
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError(string.Empty, "An error occurred while submitting the claim.");
+                    TempData["Error"] = $"Error: {ex.Message}";
+                }
             }
             return View(claim);
         }

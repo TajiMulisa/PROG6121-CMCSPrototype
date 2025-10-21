@@ -13,5 +13,7 @@ namespace CMCSPrototype.Services
         Task RejectClaim(int id);
         Task AddDocument(Document doc);
         DashboardViewModel GetDashboardStats();
+        Task<bool> HasClaimForMonth(string lecturerName, DateTime month);
+        Task<List<Claim>> GetClaimsByLecturer(string lecturerName);
     }
 }
