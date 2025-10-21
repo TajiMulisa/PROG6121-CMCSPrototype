@@ -16,5 +16,6 @@ namespace CMCSPrototype.Services
         Task<bool> HasClaimForMonth(string lecturerName, DateTime month);
         Task<List<Claim>> GetClaimsByLecturer(string lecturerName);
         Task<Claim?> GetClaimById(int id);
+        Task<List<ClaimHistory>> GetClaimHistory(int claimId);
     }
 }

@@ -41,6 +41,9 @@ namespace CMCSPrototype.Services
             _context.Claims.Add(claim);
             await _context.SaveChangesAsync();
             
+            // Record history
+            await AddClaimHistory(claim.Id, ClaimStatus.Pending, claim.LecturerName, "Claim submitted", "Submitted");
+            
             _loggingService.LogInfo($"Claim submitted by {claim.LecturerName} for R{claim.TotalAmount:N2}");
         }
         
@@ -119,6 +122,9 @@ namespace CMCSPrototype.Services
             
             await _context.SaveChangesAsync();
             
+            // Record history
+            await AddClaimHistory(id, ClaimStatus.Approved, approverName, comments ?? "Approved", "Approved");
+            
             _loggingService.LogInfo($"Claim {id} approved by {approverName} for {claim.LecturerName} - R{claim.TotalAmount:N2}");
         }
         
@@ -149,6 +155,9 @@ namespace CMCSPrototype.Services
             claim.RejectionReason = reason;
             
             await _context.SaveChangesAsync();
+            
+            // Record history
+            await AddClaimHistory(id, ClaimStatus.Rejected, rejectorName, reason, "Rejected");
             
             _loggingService.LogInfo($"Claim {id} rejected by {rejectorName} for {claim.LecturerName} - Reason: {reason}");
         }
@@ -190,8 +199,36 @@ namespace CMCSPrototype.Services
                 .OrderByDescending(c => c.SubmissionDate)
                 .ToListAsync();
         }
+        
+        // Get claim history for audit trail
+        public async Task<List<ClaimHistory>> GetClaimHistory(int claimId)
+        {
+            return await _context.ClaimHistories
+                .Where(h => h.ClaimId == claimId)
+                .OrderBy(h => h.ChangedAt)
+                .ToListAsync();
+        }
+        
+        // Private helper to add claim history
+        private async Task AddClaimHistory(int claimId, ClaimStatus status, string changedBy, string comments, string action)
+        {
+            var history = new ClaimHistory
+            {
+                ClaimId = claimId,
+                Status = status,
+                ChangedBy = changedBy,
+                Comments = comments,
+                Action = action,
+                ChangedAt = DateTime.Now
+            };
+            
+            _context.ClaimHistories.Add(history);
+            await _context.SaveChangesAsync();
+        }
 
     }
 }
+
+
 
 

@@ -8,5 +8,6 @@ namespace CMCSPrototype.Data
         public DbSet<Claim> Claims { get; set; }
         public DbSet<Document> Documents { get; set; }
         public DbSet<User> Users { get; set; }
+        public DbSet<ClaimHistory> ClaimHistories { get; set; }
     }
 }
