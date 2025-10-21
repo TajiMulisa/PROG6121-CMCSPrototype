@@ -21,6 +21,7 @@ namespace CMCSPrototype
             // Register services
             builder.Services.AddScoped<IClaimService, ClaimService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IReportService, ReportService>();
             builder.Services.AddSingleton<ILoggingService, LoggingService>();
 
             // Add session support

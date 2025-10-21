@@ -170,11 +170,18 @@ namespace CMCSPrototype.Services
         // Get dashboard statistics
         public DashboardViewModel GetDashboardStats()
         {
+            var claims = _context.Claims.ToList();
+            var totalAmount = claims.Sum(c => c.TotalAmount);
+            
             return new DashboardViewModel
             {
-                PendingClaims = _context.Claims.Count(c => c.Status == ClaimStatus.Pending),
-                TotalClaimed = _context.Claims.Sum(c => (decimal)c.HoursWorked * c.HourlyRate),
-                ApprovedClaims = _context.Claims.Count(c => c.Status == ClaimStatus.Approved)
+                PendingClaims = claims.Count(c => c.Status == ClaimStatus.Pending),
+                TotalClaimed = totalAmount,
+                ApprovedClaims = claims.Count(c => c.Status == ClaimStatus.Approved),
+                RejectedClaims = claims.Count(c => c.Status == ClaimStatus.Rejected),
+                TotalClaims = claims.Count,
+                AverageClaimAmount = claims.Any() ? totalAmount / claims.Count : 0,
+                RecentClaims = claims.OrderByDescending(c => c.SubmittedAt).Take(5).ToList()
             };
         }
         
