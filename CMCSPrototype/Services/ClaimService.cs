@@ -11,9 +11,12 @@ namespace CMCSPrototype.Services
     public class ClaimService : IClaimService
     {
         private readonly AppDbContext _context;
-        public ClaimService(AppDbContext context)
+        private readonly ILoggingService _loggingService;
+        
+        public ClaimService(AppDbContext context, ILoggingService loggingService)
         {
             _context = context;
+            _loggingService = loggingService;
         }
         // Get all pending claims for approval
         public async Task<List<Claim>> GetPendingClaims()
@@ -37,6 +40,8 @@ namespace CMCSPrototype.Services
             
             _context.Claims.Add(claim);
             await _context.SaveChangesAsync();
+            
+            _loggingService.LogInfo($"Claim submitted by {claim.LecturerName} for R{claim.TotalAmount:N2}");
         }
         
         // Automated claim verification logic
@@ -97,11 +102,13 @@ namespace CMCSPrototype.Services
             var claim = await GetClaimById(id);
             if (claim == null)
             {
+                _loggingService.LogError($"Claim {id} not found for approval");
                 throw new InvalidOperationException($"Claim with ID {id} not found.");
             }
             
             if (claim.Status != ClaimStatus.Pending)
             {
+                _loggingService.LogWarning($"Attempt to approve non-pending claim {id} by {approverName}");
                 throw new InvalidOperationException($"Only pending claims can be approved. Current status: {claim.Status}");
             }
             
@@ -111,6 +118,8 @@ namespace CMCSPrototype.Services
             claim.ApprovalComments = comments;
             
             await _context.SaveChangesAsync();
+            
+            _loggingService.LogInfo($"Claim {id} approved by {approverName} for {claim.LecturerName} - R{claim.TotalAmount:N2}");
         }
         
         // Reject a claim with tracking
@@ -119,11 +128,13 @@ namespace CMCSPrototype.Services
             var claim = await GetClaimById(id);
             if (claim == null)
             {
+                _loggingService.LogError($"Claim {id} not found for rejection");
                 throw new InvalidOperationException($"Claim with ID {id} not found.");
             }
             
             if (claim.Status != ClaimStatus.Pending)
             {
+                _loggingService.LogWarning($"Attempt to reject non-pending claim {id} by {rejectorName}");
                 throw new InvalidOperationException($"Only pending claims can be rejected. Current status: {claim.Status}");
             }
             
@@ -138,6 +149,8 @@ namespace CMCSPrototype.Services
             claim.RejectionReason = reason;
             
             await _context.SaveChangesAsync();
+            
+            _loggingService.LogInfo($"Claim {id} rejected by {rejectorName} for {claim.LecturerName} - Reason: {reason}");
         }
         // Add a document to a claim
         public async Task AddDocument(Document doc)

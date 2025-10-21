@@ -1,5 +1,6 @@
 using CMCSPrototype.Data;
 using CMCSPrototype.Services;
+using CMCSPrototype.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 namespace CMCSPrototype
@@ -20,6 +21,7 @@ namespace CMCSPrototype
             // Register services
             builder.Services.AddScoped<IClaimService, ClaimService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddSingleton<ILoggingService, LoggingService>();
 
             // Add session support
             builder.Services.AddDistributedMemoryCache();
@@ -37,6 +39,9 @@ namespace CMCSPrototype
             {
                 app.UseExceptionHandler("/Home/Error");
             }
+            
+            // Add global exception handler
+            app.UseMiddleware<GlobalExceptionHandler>();
 
             app.UseStaticFiles();
             app.UseRouting();
