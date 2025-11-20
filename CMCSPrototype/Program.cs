@@ -22,7 +22,10 @@ namespace CMCSPrototype
             builder.Services.AddScoped<IClaimService, ClaimService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IReportService, ReportService>();
+            builder.Services.AddScoped<IHRService, HRService>();
             builder.Services.AddSingleton<ILoggingService, LoggingService>();
+            builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
+            builder.Services.AddScoped<IPdfService, PdfService>();
 
             // Add session support
             builder.Services.AddDistributedMemoryCache();
@@ -51,7 +54,10 @@ namespace CMCSPrototype
 
             app.MapControllerRoute(
                 name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
+                pattern: "{controller=Account}/{action=Login}/{id?}");
+
+            // Seed the database
+            DatabaseSeeder.SeedDatabase(app.Services);
 
             app.Run();
         }
