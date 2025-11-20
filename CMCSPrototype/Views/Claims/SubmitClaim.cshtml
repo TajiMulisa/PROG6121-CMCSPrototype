@@ -1,13 +1,172 @@
-﻿@{
+﻿@model CMCSPrototype.Models.SubmitClaimViewModel
+
+@{
     ViewData["Title"] = "Submit Claim";
 }
-<h2>Submit Monthly Claim</h2>
-<form>
-    <label>Hours Worked:</label><br />
-    <input type="number" placeholder="Enter hours worked" /><br /><br />
-    <label>Hourly Rate:</label><br />
-    <input type="number" placeholder="Enter hourly rate" /><br /><br />
-    <label>Upload Supporting Documents:</label><br />
-    <input type="file" multiple /><br /><br />
-    <button type="button">Submit Claim</button>
-</form>
+
+<div class="container mt-4">
+    <h2><i class="fas fa-file-invoice-dollar"></i> Submit Monthly Claim</h2>
+    <hr />
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-edit"></i> Claim Details</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="SubmitClaim" method="post" enctype="multipart/form-data">
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                        <div class="form-group">
+                            <label asp-for="HoursWorked" class="control-label">
+                                <i class="fas fa-clock"></i> Hours Worked
+                            </label>
+                            <input asp-for="HoursWorked" class="form-control" type="number" step="0.5" 
+                                   placeholder="Enter hours worked" id="hoursWorked" oninput="calculateTotal()" />
+                            <span asp-validation-for="HoursWorked" class="text-danger"></span>
+                            <small class="form-text text-muted">Maximum 744 hours per month</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label asp-for="HourlyRate" class="control-label">
+                                <i class="fas fa-money-bill-wave"></i> Hourly Rate (R) 
+                                <span class="badge bg-info">Auto-filled by HR</span>
+                            </label>
+                            <input asp-for="HourlyRate" class="form-control bg-light" type="number" step="0.01" 
+                                   id="hourlyRate" readonly oninput="calculateTotal()" />
+                            <span asp-validation-for="HourlyRate" class="text-danger"></span>
+                            <small class="form-text text-muted">
+                                <i class="fas fa-lock"></i> Your hourly rate is set by HR and cannot be changed here
+                            </small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label asp-for="ClaimMonth" class="control-label">
+                                        <i class="fas fa-calendar-alt"></i> Claim Month
+                                    </label>
+                                    <select asp-for="ClaimMonth" asp-items="@Model.Months" class="form-control">
+                                        <option value="">-- Select Month --</option>
+                                    </select>
+                                    <span asp-validation-for="ClaimMonth" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label asp-for="ClaimYear" class="control-label">
+                                        <i class="fas fa-calendar-alt"></i> Claim Year
+                                    </label>
+                                    <select asp-for="ClaimYear" asp-items="@Model.Years" class="form-control">
+                                        <option value="">-- Select Year --</option>
+                                    </select>
+                                    <span asp-validation-for="ClaimYear" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label asp-for="Notes" class="control-label">
+                                <i class="fas fa-sticky-note"></i> Additional Notes (Optional)
+                            </label>
+                            <textarea asp-for="Notes" class="form-control" rows="3" 
+                                      placeholder="Add any additional information about this claim"></textarea>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-group">
+                            <label asp-for="Document" class="control-label">
+                                <i class="fas fa-paperclip"></i> Upload Supporting Document (Optional)
+                            </label>
+                            <input asp-for="Document" type="file" class="form-control-file" 
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                            <small class="form-text text-muted">
+                                Accepted formats: PDF, Word, Excel, Images (max 5MB)
+                            </small>
+                        </div>
+
+                        <div class="form-group mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-paper-plane"></i> Submit Claim
+                            </button>
+                            <a asp-action="TrackStatus" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-calculator"></i> Claim Summary</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tbody>
+                            <tr>
+                                <td><strong>Hours Worked:</strong></td>
+                                <td class="text-right" id="displayHours">0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Hourly Rate:</strong></td>
+                                <td class="text-right">R<span id="displayRate">0.00</span></td>
+                            </tr>
+                            <tr class="border-top">
+                                <td><strong class="text-primary">Total Amount:</strong></td>
+                                <td class="text-right"><h4 class="text-primary mb-0">R<span id="displayTotal">0.00</span></h4></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="alert alert-info mt-3">
+                        <small>
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>Note:</strong> Claims require approval from both Programme Coordinator and Admin.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-warning">
+                    <h6 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Important Notes</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="small mb-0">
+                        <li>Maximum 744 hours per month</li>
+                        <li>One claim per lecturer per month</li>
+                        <li>Documents are optional but recommended</li>
+                        <li>Claims older than 3 months cannot be submitted</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        function calculateTotal() {
+            var hours = parseFloat(document.getElementById('hoursWorked').value) || 0;
+            var rate = parseFloat(document.getElementById('hourlyRate').value) || 0;
+            var total = hours * rate;
+            
+            document.getElementById('displayHours').innerText = hours.toFixed(2);
+            document.getElementById('displayRate').innerText = rate.toFixed(2);
+            document.getElementById('displayTotal').innerText = total.toFixed(2);
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            calculateTotal();
+            
+            // Add event listeners
+            document.getElementById('hoursWorked').addEventListener('input', calculateTotal);
+            document.getElementById('hourlyRate').addEventListener('input', calculateTotal);
+        });
+    </script>
+}
