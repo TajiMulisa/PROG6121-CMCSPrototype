@@ -3,6 +3,7 @@ using CMCSPrototype.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CMCSPrototype.Models;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 
 namespace CMCSPrototype.Controllers
@@ -11,17 +12,59 @@ namespace CMCSPrototype.Controllers
     {
         private readonly IClaimService _claimService;
         private readonly AppDbContext _context;
+        private readonly IEncryptionService _encryptionService;
 
-        public ClaimsController(IClaimService claimService, AppDbContext context)
+        public ClaimsController(IClaimService claimService, AppDbContext context, IEncryptionService encryptionService)
         {
             _claimService = claimService;
             _context = context;
+            _encryptionService = encryptionService;
         }
 
         // Lecturer Claim Submission Page
-        public IActionResult SubmitClaim()
+        public async Task<IActionResult> SubmitClaim()
         {
-            return View();
+            var userRole = HttpContext.Session.GetString("UserRole");
+            var userIdStr = HttpContext.Session.GetString("UserId");
+            
+            if (string.IsNullOrEmpty(userRole) || string.IsNullOrEmpty(userIdStr))
+            {
+                TempData["Warning"] = "Please log in to continue.";
+                return RedirectToAction("Login", "Account");
+            }
+            
+            if (userRole != "Lecturer")
+            {
+                TempData["Error"] = "Only Lecturers can submit claims.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            // Get user's hourly rate from database
+            var userId = int.Parse(userIdStr);
+            var user = await _context.Users.FindAsync(userId);
+            
+            if (user == null || !user.HourlyRate.HasValue)
+            {
+                TempData["Error"] = "Your hourly rate has not been set. Please contact HR.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            var viewModel = new SubmitClaimViewModel
+            {
+                HourlyRate = user.HourlyRate.Value,
+                Months = Enumerable.Range(1, 12).Select(i => new SelectListItem
+                {
+                    Value = i.ToString(),
+                    Text = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i)
+                }),
+                Years = Enumerable.Range(0, 5).Select(i => new SelectListItem
+                {
+                    Value = (DateTime.Now.Year - i).ToString(),
+                    Text = (DateTime.Now.Year - i).ToString()
+                })
+            };
+            
+            return View(viewModel);
         }
 
         // Programme Coordinator / Academic Manager Claim Approval Page
@@ -48,16 +91,18 @@ namespace CMCSPrototype.Controllers
             var successCount = 0;
             var errorMessages = new List<string>();
             
-            foreach (var document in documents)
+            foreach (var documentFile in documents)
             {
                 try
                 {
-                    await HandleFileUpload(document, claimId);
+                    var document = await HandleFileUpload(documentFile);
+                    document.ClaimId = claimId; // Set the claimId after HandleFileUpload returns the document
+                    await _claimService.AddDocument(document);
                     successCount++;
                 }
                 catch (Exception ex)
                 {
-                    errorMessages.Add($"{document.FileName}: {ex.Message}");
+                    errorMessages.Add($"{documentFile.FileName}: {ex.Message}");
                 }
             }
             
@@ -75,59 +120,124 @@ namespace CMCSPrototype.Controllers
         }
 
         // Claim Status Tracking Page
-        public IActionResult TrackStatus()
+        public async Task<IActionResult> TrackStatus()
         {
-            return View();
+            var userName = HttpContext.Session.GetString("UserName");
+            var userRole = HttpContext.Session.GetString("UserRole");
+            
+            if (string.IsNullOrEmpty(userName) && string.IsNullOrEmpty(userRole))
+            {
+                // If no user is logged in, redirect to role selection
+                TempData["Warning"] = "Please select a role to continue.";
+                return RedirectToAction("SelectRole", "Account");
+            }
+
+            // Get claims based on role
+            var claims = new List<Claim>();
+            
+            if (userRole == "Lecturer")
+            {
+                // Lecturers see only their own claims
+                claims = await _context.Claims
+                    .Include(c => c.Documents)
+                    .Where(c => c.LecturerName == userName)
+                    .OrderByDescending(c => c.SubmissionDate)
+                    .ToListAsync();
+            }
+            else if (userRole == "Coordinator" || userRole == "Manager")
+            {
+                // Coordinators and Admins see all claims
+                claims = await _context.Claims
+                    .Include(c => c.Documents)
+                    .OrderByDescending(c => c.SubmissionDate)
+                    .ToListAsync();
+            }
+                
+            return View(claims);
         }
 
         [HttpPost]
-        public async Task<IActionResult> SubmitClaim(Claim claim, IFormFile document)
+        public async Task<IActionResult> SubmitClaim(SubmitClaimViewModel model)
         {
             if (ModelState.IsValid)
             {
                 try
                 {
-                    claim.SubmissionDate = DateTime.Now;
+                    var userName = HttpContext.Session.GetString("UserName");
+                    var userIdStr = HttpContext.Session.GetString("UserId");
+                    var role = HttpContext.Session.GetString("UserRole");
+
+                    if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(userIdStr) || role != "Lecturer")
+                    {
+                        TempData["Error"] = "Invalid session. Please log in again.";
+                        return RedirectToAction("Login", "Account");
+                    }
+
+                    var userId = int.Parse(userIdStr);
+                    var user = await _context.Users.FindAsync(userId);
+
+                    if (user == null || !user.HourlyRate.HasValue)
+                    {
+                        TempData["Error"] = "Your hourly rate has not been set. Please contact HR.";
+                        return RedirectToAction("Index", "Home");
+                    }
+
+                    var claim = new Claim
+                    {
+                        LecturerName = userName,
+                        HoursWorked = model.HoursWorked,
+                        HourlyRate = user.HourlyRate.Value,
+                        Notes = model.Notes,
+                        SubmissionDate = new DateTime(model.ClaimYear, model.ClaimMonth, 1),
+                        ClaimMonth = model.ClaimMonth,
+                        ClaimYear = model.ClaimYear,
+                        SubmittedAt = DateTime.Now,
+                        Status = ClaimStatus.Pending
+                    };
+
+                    if (model.Document != null && model.Document.Length > 0)
+                    {
+                        var document = await HandleFileUpload(model.Document);
+                        claim.Documents.Add(document);
+                    }
+
                     await _claimService.SubmitClaim(claim);
-                    
-                    if (document != null)
-                    {
-                        try
-                        {
-                            await HandleFileUpload(document, claim.Id);
-                            TempData["Success"] = "Claim submitted successfully with document!";
-                        }
-                        catch (Exception ex)
-                        {
-                            TempData["Warning"] = $"Claim submitted but file upload failed: {ex.Message}";
-                        }
-                    }
-                    else
-                    {
-                        TempData["Success"] = "Claim submitted successfully! Automated verification passed.";
-                    }
-                    
+
+                    TempData["Success"] = "Claim submitted successfully!";
                     return RedirectToAction("TrackStatus");
-                }
-                catch (InvalidOperationException ex)
-                {
-                    // Validation errors from automated verification
-                    ModelState.AddModelError(string.Empty, ex.Message);
-                    TempData["Error"] = ex.Message;
                 }
                 catch (Exception ex)
                 {
-                    ModelState.AddModelError(string.Empty, "An error occurred while submitting the claim.");
-                    TempData["Error"] = $"Error: {ex.Message}";
+                    ModelState.AddModelError(string.Empty, ex.Message);
+                    TempData["Error"] = $"Submission failed: {ex.Message}";
                 }
             }
-            return View(claim);
+
+            model.Months = Enumerable.Range(1, 12).Select(i => new SelectListItem
+            {
+                Value = i.ToString(),
+                Text = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(i)
+            });
+            model.Years = Enumerable.Range(0, 5).Select(i => new SelectListItem
+            {
+                Value = (DateTime.Now.Year - i).ToString(),
+                Text = (DateTime.Now.Year - i).ToString()
+            });
+
+            return View(model);
         }
 
         [HttpGet]
         public async Task<IActionResult> GetApproveClaims()
         {
-            var claims = await _claimService.GetPendingClaims();
+            var role = HttpContext.Session.GetString("UserRole");
+            if (string.IsNullOrEmpty(role))
+            {
+                TempData["Warning"] = "Please log in to continue.";
+                return RedirectToAction("Login", "Account");
+            }
+
+            var claims = await _claimService.GetPendingClaims(role);
             return View("ApproveClaims", claims);
         }
 
@@ -136,14 +246,14 @@ namespace CMCSPrototype.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(approverName))
+                var role = HttpContext.Session.GetString("UserRole");
+                if (string.IsNullOrWhiteSpace(role) || (role != "Coordinator" && role != "Manager"))
                 {
-                    TempData["Error"] = "Approver name is required.";
+                    TempData["Error"] = "Only Coordinator or Manager can approve claims.";
                     return RedirectToAction("GetApproveClaims");
                 }
-                
-                await _claimService.ApproveClaim(id, approverName, comments ?? "Approved");
-                TempData["Success"] = "Claim approved successfully!";
+                await _claimService.ApproveClaim(id, role, comments ?? "Approved");
+                TempData["Success"] = $"Claim approved by {role}!";
             }
             catch (InvalidOperationException ex)
             {
@@ -153,7 +263,6 @@ namespace CMCSPrototype.Controllers
             {
                 TempData["Error"] = $"Error approving claim: {ex.Message}";
             }
-            
             return RedirectToAction("GetApproveClaims");
         }
 
@@ -162,9 +271,10 @@ namespace CMCSPrototype.Controllers
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(rejectorName))
+                var role = HttpContext.Session.GetString("UserRole");
+                if (string.IsNullOrWhiteSpace(role) || (role != "Coordinator" && role != "Manager"))
                 {
-                    TempData["Error"] = "Rejector name is required.";
+                    TempData["Error"] = "Only Coordinator or Manager can reject claims.";
                     return RedirectToAction("GetApproveClaims");
                 }
                 
@@ -174,7 +284,8 @@ namespace CMCSPrototype.Controllers
                     return RedirectToAction("GetApproveClaims");
                 }
                 
-                await _claimService.RejectClaim(id, rejectorName, reason);
+                // Use the role as the rejector name for consistency
+                await _claimService.RejectClaim(id, role, reason);
                 TempData["Success"] = "Claim rejected successfully!";
             }
             catch (InvalidOperationException ex)
@@ -208,8 +319,48 @@ namespace CMCSPrototype.Controllers
                 return RedirectToAction("GetApproveClaims");
             }
         }
+        
+        [HttpGet]
+        public async Task<IActionResult> ClaimHistory(int id)
+        {
+            try
+            {
+                var history = await _claimService.GetClaimHistory(id);
+                ViewBag.ClaimId = id;
+                return View(history);
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error loading claim history: {ex.Message}";
+                return RedirectToAction("TrackStatus");
+            }
+        }
 
-        private async Task HandleFileUpload(IFormFile file, int claimId)
+        [HttpGet]
+        public async Task<IActionResult> DownloadDocument(int id)
+        {
+            var document = await _context.Documents.FindAsync(id);
+
+            if (document == null)
+            {
+                TempData["Error"] = "Document not found.";
+                return RedirectToAction("TrackStatus");
+            }
+
+            var encryptedFilePath = document.FilePath;
+            if (!System.IO.File.Exists(encryptedFilePath))
+            {
+                TempData["Error"] = "File not found on server.";
+                return RedirectToAction("TrackStatus");
+            }
+
+            var encryptedData = await System.IO.File.ReadAllBytesAsync(encryptedFilePath);
+            var decryptedStream = _encryptionService.Decrypt(encryptedData);
+
+            return File(decryptedStream, document.ContentType, document.FileName);
+        }
+
+        private async Task<Document> HandleFileUpload(IFormFile file)
         {
             // Validate file size (max 5MB)
             const long maxFileSize = 5 * 1024 * 1024;
@@ -250,34 +401,24 @@ namespace CMCSPrototype.Controllers
                 Directory.CreateDirectory(uploadsFolder);
             }
             
-            // Generate unique filename
-            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+            var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}.enc";
             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
             
-            // Save file to disk
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            using (var fileStream = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                var encryptedData = _encryptionService.Encrypt(fileStream);
+                await System.IO.File.WriteAllBytesAsync(filePath, encryptedData);
             }
             
             // Create document record
-            var document = new Document
+            return new Document
             {
                 FileName = file.FileName,
                 FilePath = filePath,
-                ClaimId = claimId,
                 FileSize = file.Length,
                 ContentType = file.ContentType,
                 UploadedAt = DateTime.Now
             };
-            
-            await _claimService.AddDocument(document);
-        }
-
-        public async Task<IActionResult> TrackStatus(string lecturerName)
-        {
-            var claims = await _context.Claims.Where(c => c.LecturerName == lecturerName).ToListAsync();
-            return View(claims);
         }
     }
 }

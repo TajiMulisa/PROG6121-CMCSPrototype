@@ -1,0 +1,321 @@
+@model CMCSPrototype.Models.Claim
+@using CMCSPrototype.Models
+
+@{
+    ViewData["Title"] = "Claim Details";
+    var userRole = Context.Session.GetString("UserRole");
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="fas fa-file-invoice"></i> Claim Details - #@Model.Id</h2>
+        <a asp-action="GetApproveClaims" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Claims
+        </a>
+    </div>
+    <hr />
+
+    <div class="row">
+        <!-- Claim Information -->
+        <div class="col-md-8">
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Claim Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Claim ID:</strong> #@Model.Id</p>
+                            <p><strong>Lecturer Name:</strong> @Model.LecturerName</p>
+                            <p><strong>Hours Worked:</strong> @Model.HoursWorked hrs</p>
+                            <p><strong>Hourly Rate:</strong> R @Model.HourlyRate.ToString("N2")</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Total Amount:</strong> <span class="text-primary h4">R @Model.TotalAmount.ToString("N2")</span></p>
+                            <p><strong>Submission Date:</strong> @Model.SubmissionDate.ToString("dd MMM yyyy HH:mm")</p>
+                            <p><strong>Status:</strong> 
+                                @if (Model.Status == ClaimStatus.Pending)
+                                {
+                                    <span class="badge badge-warning badge-lg">Pending</span>
+                                }
+                                else if (Model.Status == ClaimStatus.Verified)
+                                {
+                                    <span class="badge badge-info badge-lg">Verified</span>
+                                }
+                                else if (Model.Status == ClaimStatus.Approved)
+                                {
+                                    <span class="badge badge-success badge-lg">Fully Approved</span>
+                                }
+                                else if (Model.Status == ClaimStatus.Rejected)
+                                {
+                                    <span class="badge badge-danger badge-lg">Rejected</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(Model.Notes))
+                    {
+                        <hr />
+                        <p><strong>Notes:</strong></p>
+                        <div class="alert alert-light">
+                            @Model.Notes
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Documents -->
+            @if (Model.Documents != null && Model.Documents.Any())
+            {
+                <div class="card mb-3">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-paperclip"></i> Supporting Documents</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            @foreach (var doc in Model.Documents)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="fas fa-file fa-2x text-primary mr-3"></i>
+                                            <strong>@doc.FileName</strong>
+                                            <br />
+                                            <small class="text-muted">
+                                                Size: @((doc.FileSize / 1024.0).ToString("N2")) KB | 
+                                                Uploaded: @doc.UploadedAt.ToString("dd MMM yyyy HH:mm")
+                                            </small>
+                                        </div>
+                                        <a asp-action="DownloadDocument" asp-route-id="@doc.Id" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-download"></i> Download
+                                        </a>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> No documents attached to this claim.
+                </div>
+            }
+        </div>
+
+        <!-- Approval Timeline -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-check"></i> Approval Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <!-- Submission -->
+                        <div class="timeline-item">
+                            <i class="fas fa-paper-plane text-primary"></i>
+                            <strong>Submitted</strong>
+                            <div class="text-muted small">@Model.SubmittedAt.ToString("dd MMM yyyy HH:mm")</div>
+                        </div>
+
+                        <!-- Coordinator Verification -->
+                        @if (!string.IsNullOrEmpty(Model.CoordinatorApprovedBy))
+                        {
+                            <div class="timeline-item">
+                                <i class="fas fa-check-circle text-success"></i>
+                                <strong>Verified</strong>
+                                <div class="text-muted small">
+                                    By: @Model.CoordinatorApprovedBy<br />
+                                    Date: @Model.CoordinatorApprovedAt?.ToString("dd MMM yyyy HH:mm")
+                                </div>
+                                @if (!string.IsNullOrEmpty(Model.CoordinatorApprovalComments))
+                                {
+                                    <div class="alert alert-success mt-2 mb-2 small">
+                                        <strong>Comments:</strong><br />@Model.CoordinatorApprovalComments
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (Model.Status == ClaimStatus.Pending)
+                        {
+                            <div class="timeline-item">
+                                <i class="fas fa-hourglass-half text-warning"></i>
+                                <strong>Awaiting Verification</strong>
+                            </div>
+                        }
+
+                        <!-- Manager Approval -->
+                        @if (!string.IsNullOrEmpty(Model.ManagerApprovedBy))
+                        {
+                            <div class="timeline-item">
+                                <i class="fas fa-check-double text-success"></i>
+                                <strong>Manager Approved</strong>
+                                <div class="text-muted small">
+                                    By: @Model.ManagerApprovedBy<br />
+                                    Date: @Model.ManagerApprovedAt?.ToString("dd MMM yyyy HH:mm")
+                                </div>
+                                @if (!string.IsNullOrEmpty(Model.ManagerApprovalComments))
+                                {
+                                    <div class="alert alert-success mt-2 mb-2 small">
+                                        <strong>Comments:</strong><br />@Model.ManagerApprovalComments
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (Model.Status == ClaimStatus.Verified)
+                        {
+                            <div class="timeline-item">
+                                <i class="fas fa-hourglass-half text-warning"></i>
+                                <strong>Awaiting Manager Approval</strong>
+                            </div>
+                        }
+
+                        <!-- Rejection -->
+                        @if (!string.IsNullOrEmpty(Model.RejectedBy))
+                        {
+                            <div class="timeline-item">
+                                <i class="fas fa-times-circle text-danger"></i>
+                                <strong>Rejected</strong>
+                                <div class="text-muted small">
+                                    By: @Model.RejectedBy<br />
+                                    Date: @Model.RejectedAt?.ToString("dd MMM yyyy HH:mm")
+                                </div>
+                                <div class="alert alert-danger mt-2 mb-2 small">
+                                    <strong>Reason:</strong><br />@Model.RejectionReason
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            @if ((userRole == "Coordinator" && Model.Status == ClaimStatus.Pending) || 
+                 (userRole == "Manager" && Model.Status == ClaimStatus.Verified))
+            {
+                <div class="card mt-3">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0"><i class="fas fa-tasks"></i> Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <button type="button" class="btn btn-success btn-block mb-2" data-toggle="modal" data-target="#approveModal">
+                            <i class="fas fa-check"></i> @(userRole == "Coordinator" ? "Verify" : "Approve")
+                        </button>
+                        <button type="button" class="btn btn-danger btn-block" data-toggle="modal" data-target="#rejectModal">
+                            <i class="fas fa-times"></i> Reject
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check"></i> @(userRole == "Coordinator" ? "Verify" : "Approve") Claim #@Model.Id
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form asp-action="Approve" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <input type="hidden" name="approverName" value="@userRole" />
+                    
+                    <p>Are you sure you want to @(userRole == "Coordinator" ? "verify" : "approve") this claim?</p>
+                    <p><strong>Lecturer:</strong> @Model.LecturerName</p>
+                    <p><strong>Amount:</strong> R @Model.TotalAmount.ToString("N2")</p>
+                    
+                    <div class="form-group">
+                        <label for="comments">Comments (Optional):</label>
+                        <textarea name="comments" id="comments" class="form-control" rows="3" 
+                                  placeholder="Add any comments about this approval"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check"></i> @(userRole == "Coordinator" ? "Verify" : "Approve")
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-times"></i> Reject Claim #@Model.Id
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form asp-action="Reject" method="post">
+                <div class="modal-body">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <input type="hidden" name="rejectorName" value="@userRole" />
+                    
+                    <p>Are you sure you want to reject this claim?</p>
+                    <p><strong>Lecturer:</strong> @Model.LecturerName</p>
+                    <p><strong>Amount:</strong> R @Model.TotalAmount.ToString("N2")</p>
+                    
+                    <div class="form-group">
+                        <label for="reason">Rejection Reason (Required):</label>
+                        <textarea name="reason" id="reason" class="form-control" rows="3" 
+                                  placeholder="Explain why this claim is being rejected" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-bottom: 20px;
+        padding-left: 15px;
+        border-left: 2px solid #dee2e6;
+    }
+    
+    .timeline-item:last-child {
+        border-left: 0;
+    }
+    
+    .timeline-item i {
+        position: absolute;
+        left: -10px;
+        background: white;
+        padding: 2px;
+    }
+    
+    .badge-lg {
+        font-size: 1em;
+        padding: 0.5em 0.75em;
+    }
+</style>
+
