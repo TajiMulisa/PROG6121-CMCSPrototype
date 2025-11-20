@@ -25,37 +25,50 @@ namespace CMCSPrototype.Models
         
         [DataType(DataType.Date)]
         public DateTime SubmissionDate { get; set; }
+
+        [Required(ErrorMessage = "Claim month is required")]
+        [Range(1, 12, ErrorMessage = "Invalid month")]
+        public int ClaimMonth { get; set; }
+
+        [Required(ErrorMessage = "Claim year is required")]
+        [Range(2020, 2030, ErrorMessage = "Invalid year")]
+        public int ClaimYear { get; set; }
         
         public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
         
         public DateTime SubmittedAt { get; set; } = DateTime.Now;
         
-        // Approval/Rejection tracking fields
-        [StringLength(100)]
-        public string? ApprovedBy { get; set; }
-        
-        public DateTime? ApprovedAt { get; set; }
-        
-        [StringLength(1000, ErrorMessage = "Approval comments cannot exceed 1000 characters")]
-        public string? ApprovalComments { get; set; }
-        
-        [StringLength(100)]
-        public string? RejectedBy { get; set; }
-        
-        public DateTime? RejectedAt { get; set; }
-        
-        [StringLength(1000, ErrorMessage = "Rejection reason cannot exceed 1000 characters")]
-        public string? RejectionReason { get; set; }
-        
-        public List<Document> Documents { get; set; } = new List<Document>();
-        
-        // Calculated property for total amount
-        public decimal TotalAmount => (decimal)HoursWorked * HourlyRate;
+    // Coordinator approval
+    [StringLength(100)]
+    public string? CoordinatorApprovedBy { get; set; }
+    public DateTime? CoordinatorApprovedAt { get; set; }
+    [StringLength(1000)]
+    public string? CoordinatorApprovalComments { get; set; }
+
+    // Manager approval
+    [StringLength(100)]
+    public string? ManagerApprovedBy { get; set; }
+    public DateTime? ManagerApprovedAt { get; set; }
+    [StringLength(1000)]
+    public string? ManagerApprovalComments { get; set; }
+
+    // Rejection
+    [StringLength(100)]
+    public string? RejectedBy { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    [StringLength(1000)]
+    public string? RejectionReason { get; set; }
+
+    public List<Document> Documents { get; set; } = new List<Document>();
+
+    // Calculated property for total amount
+    public decimal TotalAmount => (decimal)HoursWorked * HourlyRate;
     }
     
     public enum ClaimStatus
     {
         Pending,
+        Verified,
         Approved,
         Rejected
     }

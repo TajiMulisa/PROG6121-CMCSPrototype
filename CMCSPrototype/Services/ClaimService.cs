@@ -18,10 +18,26 @@ namespace CMCSPrototype.Services
             _context = context;
             _loggingService = loggingService;
         }
-        // Get all pending claims for approval
-        public async Task<List<Claim>> GetPendingClaims()
+        // Get all pending claims for approval based on role
+        public async Task<List<Claim>> GetPendingClaims(string role)
         {
-            return await _context.Claims.Where(c => c.Status == ClaimStatus.Pending).ToListAsync();
+            if (role == "Coordinator")
+            {
+                return await _context.Claims
+                    .Include(c => c.Documents)
+                    .Where(c => c.Status == ClaimStatus.Pending)
+                    .OrderByDescending(c => c.SubmittedAt)
+                    .ToListAsync();
+            }
+            else if (role == "Manager")
+            {
+                return await _context.Claims
+                    .Include(c => c.Documents)
+                    .Where(c => c.Status == ClaimStatus.Verified)
+                    .OrderByDescending(c => c.SubmittedAt)
+                    .ToListAsync();
+            }
+            return new List<Claim>(); // Return empty list for other roles
         }
         // Get a specific claim by ID (including documents)
         public async Task<Claim?> GetClaimById(int id)
@@ -51,25 +67,22 @@ namespace CMCSPrototype.Services
         private async Task ValidateClaim(Claim claim)
         {
             // Rule 1: Check for duplicate claims in the same month
-            var startOfMonth = new DateTime(claim.SubmissionDate.Year, claim.SubmissionDate.Month, 1);
-            var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
-            
             var duplicateClaim = await _context.Claims
                 .Where(c => c.LecturerName == claim.LecturerName
-                    && c.SubmissionDate >= startOfMonth
-                    && c.SubmissionDate <= endOfMonth
+                    && c.ClaimMonth == claim.ClaimMonth
+                    && c.ClaimYear == claim.ClaimYear
                     && c.Id != claim.Id)
                 .FirstOrDefaultAsync();
             
             if (duplicateClaim != null)
             {
                 throw new InvalidOperationException(
-                    $"A claim for {claim.LecturerName} already exists for {claim.SubmissionDate:MMMM yyyy}. " +
+                    $"A claim for {claim.LecturerName} already exists for {new DateTime(claim.ClaimYear, claim.ClaimMonth, 1):MMMM yyyy}. " +
                     "Only one claim per month is allowed.");
             }
             
             // Rule 2: Validate hours don't exceed reasonable monthly limit
-            const double maxMonthlyHours = 200; // Reasonable monthly work hours
+            const double maxMonthlyHours = 180; // Reasonable monthly work hours
             if (claim.HoursWorked > maxMonthlyHours)
             {
                 throw new InvalidOperationException(
@@ -100,7 +113,7 @@ namespace CMCSPrototype.Services
             }
         }
         // Approve a claim with tracking
-        public async Task ApproveClaim(int id, string approverName, string comments)
+        public async Task ApproveClaim(int id, string approverRole, string comments)
         {
             var claim = await GetClaimById(id);
             if (claim == null)
@@ -108,28 +121,51 @@ namespace CMCSPrototype.Services
                 _loggingService.LogError($"Claim {id} not found for approval");
                 throw new InvalidOperationException($"Claim with ID {id} not found.");
             }
-            
-            if (claim.Status != ClaimStatus.Pending)
+
+            // Coordinator approval - first stage (Verification)
+            if (approverRole == "Coordinator")
             {
-                _loggingService.LogWarning($"Attempt to approve non-pending claim {id} by {approverName}");
-                throw new InvalidOperationException($"Only pending claims can be approved. Current status: {claim.Status}");
+                if (claim.Status != ClaimStatus.Pending)
+                {
+                    _loggingService.LogWarning($"Attempt to verify non-pending claim {id} by Coordinator");
+                    throw new InvalidOperationException($"Claim must be in Pending status for Coordinator verification. Current status: {claim.Status}");
+                }
+
+                claim.CoordinatorApprovedBy = approverRole;
+                claim.CoordinatorApprovedAt = DateTime.Now;
+                claim.CoordinatorApprovalComments = comments;
+                claim.Status = ClaimStatus.Verified;
+
+                await AddClaimHistory(id, ClaimStatus.Verified, approverRole, comments ?? "Verified by Coordinator", "Coordinator Verified");
+                _loggingService.LogInfo($"Claim {id} verified by Coordinator for {claim.LecturerName} - R{claim.TotalAmount:N2}");
             }
-            
-            claim.Status = ClaimStatus.Approved;
-            claim.ApprovedBy = approverName;
-            claim.ApprovedAt = DateTime.Now;
-            claim.ApprovalComments = comments;
-            
+            // Manager approval - second stage (Final Approval)
+            else if (approverRole == "Manager")
+            {
+                if (claim.Status != ClaimStatus.Verified)
+                {
+                    _loggingService.LogWarning($"Attempt to approve claim {id} by Manager without Coordinator verification");
+                    throw new InvalidOperationException($"Claim must be verified by Coordinator first. Current status: {claim.Status}");
+                }
+
+                claim.ManagerApprovedBy = approverRole;
+                claim.ManagerApprovedAt = DateTime.Now;
+                claim.ManagerApprovalComments = comments;
+                claim.Status = ClaimStatus.Approved;
+
+                await AddClaimHistory(id, ClaimStatus.Approved, approverRole, comments ?? "Approved by Manager", "Manager Approved - Final");
+                _loggingService.LogInfo($"Claim {id} fully approved by Manager for {claim.LecturerName} - R{claim.TotalAmount:N2}");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Invalid approver role: {approverRole}");
+            }
+
             await _context.SaveChangesAsync();
-            
-            // Record history
-            await AddClaimHistory(id, ClaimStatus.Approved, approverName, comments ?? "Approved", "Approved");
-            
-            _loggingService.LogInfo($"Claim {id} approved by {approverName} for {claim.LecturerName} - R{claim.TotalAmount:N2}");
         }
         
         // Reject a claim with tracking
-        public async Task RejectClaim(int id, string rejectorName, string reason)
+        public async Task RejectClaim(int id, string rejectorRole, string reason)
         {
             var claim = await GetClaimById(id);
             if (claim == null)
@@ -138,10 +174,10 @@ namespace CMCSPrototype.Services
                 throw new InvalidOperationException($"Claim with ID {id} not found.");
             }
             
-            if (claim.Status != ClaimStatus.Pending)
+            if (claim.Status == ClaimStatus.Approved || claim.Status == ClaimStatus.Rejected)
             {
-                _loggingService.LogWarning($"Attempt to reject non-pending claim {id} by {rejectorName}");
-                throw new InvalidOperationException($"Only pending claims can be rejected. Current status: {claim.Status}");
+                _loggingService.LogWarning($"Attempt to reject already finalized claim {id} by {rejectorRole}");
+                throw new InvalidOperationException($"Cannot reject a claim with status: {claim.Status}");
             }
             
             if (string.IsNullOrWhiteSpace(reason))
@@ -150,16 +186,16 @@ namespace CMCSPrototype.Services
             }
             
             claim.Status = ClaimStatus.Rejected;
-            claim.RejectedBy = rejectorName;
+            claim.RejectedBy = rejectorRole;
             claim.RejectedAt = DateTime.Now;
             claim.RejectionReason = reason;
             
             await _context.SaveChangesAsync();
             
             // Record history
-            await AddClaimHistory(id, ClaimStatus.Rejected, rejectorName, reason, "Rejected");
+            await AddClaimHistory(id, ClaimStatus.Rejected, rejectorRole, reason, "Rejected");
             
-            _loggingService.LogInfo($"Claim {id} rejected by {rejectorName} for {claim.LecturerName} - Reason: {reason}");
+            _loggingService.LogInfo($"Claim {id} rejected by {rejectorRole} for {claim.LecturerName} - Reason: {reason}");
         }
         // Add a document to a claim
         public async Task AddDocument(Document doc)
@@ -186,15 +222,12 @@ namespace CMCSPrototype.Services
         }
         
         // Check if lecturer has already submitted a claim for a specific month
-        public async Task<bool> HasClaimForMonth(string lecturerName, DateTime month)
+        public async Task<bool> HasClaimForMonth(string lecturerName, int month, int year)
         {
-            var startOfMonth = new DateTime(month.Year, month.Month, 1);
-            var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
-            
             return await _context.Claims
                 .AnyAsync(c => c.LecturerName == lecturerName
-                    && c.SubmissionDate >= startOfMonth
-                    && c.SubmissionDate <= endOfMonth);
+                    && c.ClaimMonth == month
+                    && c.ClaimYear == year);
         }
         
         // Get all claims for a specific lecturer
@@ -231,6 +264,15 @@ namespace CMCSPrototype.Services
             
             _context.ClaimHistories.Add(history);
             await _context.SaveChangesAsync();
+        }
+
+        // Get all claims (for HR dashboard)
+        public async Task<List<Claim>> GetAllClaims()
+        {
+            return await _context.Claims
+                .Include(c => c.Documents)
+                .OrderByDescending(c => c.SubmittedAt)
+                .ToListAsync();
         }
 
     }
