@@ -23,6 +23,7 @@ namespace CMCSPrototype.Services
         {
             if (role == "Coordinator")
             {
+
                 return await _context.Claims
                     .Include(c => c.Documents)
                     .Where(c => c.Status == ClaimStatus.Pending)

@@ -18,5 +18,6 @@ namespace CMCSPrototype.Services
         Task<Claim?> GetClaimById(int id);
         Task<List<ClaimHistory>> GetClaimHistory(int claimId);
         Task<List<Claim>> GetAllClaims();
+
     }
 }
