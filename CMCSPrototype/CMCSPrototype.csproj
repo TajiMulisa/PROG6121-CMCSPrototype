@@ -7,22 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Controllers\AccountController.cs" />
-    <Compile Remove="Models\User.cs" />
-    <Compile Remove="Services\AuthService.cs" />
-    <Compile Remove="Services\IAuthService.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="Controllers\AccountController.cs" />
-    <None Include="Models\User.cs" />
-    <None Include="Services\AuthService.cs" />
-    <None Include="Services\IAuthService.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
+    <PackageReference Include="QuestPDF" Version="2025.7.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Views\Reports\" />
   </ItemGroup>
 
 </Project>

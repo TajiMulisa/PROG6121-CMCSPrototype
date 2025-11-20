@@ -34,40 +34,21 @@ namespace CMCSPrototype.Controllers
                 HttpContext.Session.SetString("UserId", user.Id.ToString());
                 HttpContext.Session.SetString("UserName", user.FullName);
                 HttpContext.Session.SetString("UserRole", user.Role.ToString());
+                HttpContext.Session.SetString("UserEmail", user.Email);
 
                 TempData["Success"] = $"Welcome back, {user.FullName}!";
+                
+                // Redirect based on role
+                if (user.Role == UserRole.HR)
+                {
+                    return RedirectToAction("Index", "HR");
+                }
+                
                 return RedirectToAction("Index", "Home");
             }
             catch (Exception ex)
             {
                 TempData["Error"] = $"Login error: {ex.Message}";
-                return View();
-            }
-        }
-
-        [HttpGet]
-        public IActionResult Register()
-        {
-            return View();
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Register(string fullName, string email, string password, UserRole role)
-        {
-            try
-            {
-                await _authService.Register(fullName, email, password, role);
-                TempData["Success"] = "Registration successful! Please login.";
-                return RedirectToAction("Login");
-            }
-            catch (InvalidOperationException ex)
-            {
-                TempData["Error"] = ex.Message;
-                return View();
-            }
-            catch (Exception ex)
-            {
-                TempData["Error"] = $"Registration error: {ex.Message}";
                 return View();
             }
         }

@@ -1,0 +1,66 @@
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h3 class="font-weight-light my-2"><i class="fas fa-user-circle"></i> Login</h3>
+                    <p class="small mb-0 text-white-50">Contract Monthly Claim System</p>
+                </div>
+                <div class="card-body p-5">
+                    <form asp-action="Login" method="post">
+                        <div class="form-group mb-4">
+                            <label for="email" class="form-label text-muted">Email Address</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light border-right-0"><i class="fas fa-envelope text-primary"></i></span>
+                                </div>
+                                <input type="email" class="form-control border-left-0" id="email" name="email" placeholder="name@example.com" required autofocus />
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-4">
+                            <label for="password" class="form-label text-muted">Password</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light border-right-0"><i class="fas fa-lock text-primary"></i></span>
+                                </div>
+                                <input type="password" class="form-control border-left-0" id="password" name="password" placeholder="Enter password" required />
+                            </div>
+                        </div>
+
+                        <div class="form-group d-flex align-items-center justify-content-between mt-4 mb-0">
+                            <button type="submit" class="btn btn-primary btn-lg btn-block shadow-sm">
+                                <i class="fas fa-sign-in-alt"></i> Login
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center py-3 bg-light">
+                    <div class="small">
+                        <i class="fas fa-info-circle text-info"></i> 
+                        Don't have an account? Contact HR.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Demo Credentials Hint -->
+            <div class="alert alert-info mt-4 shadow-sm">
+                <h5><i class="fas fa-key"></i> Demo Credentials:</h5>
+                <ul class="mb-0 pl-3">
+                    <li><strong>HR:</strong> hr@cmcs.com / hr123</li>
+                    <li><strong>Lecturer:</strong> john.smith@cmcs.com / lecturer123</li>
+                    <li><strong>Coordinator:</strong> coordinator@cmcs.com / coord123</li>
+                    <li><strong>Manager:</strong> manager@cmcs.com / manager123</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -1,4 +1,4 @@
-using CMCSPrototype.Data;
+﻿using CMCSPrototype.Data;
 using CMCSPrototype.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -57,7 +57,7 @@ namespace CMCSPrototype.Services
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-            
+
             _loggingService.LogInfo($"New user registered: {fullName} ({role})");
             return user;
         }

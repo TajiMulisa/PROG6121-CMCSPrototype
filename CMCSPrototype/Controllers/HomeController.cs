@@ -17,6 +17,13 @@ public class HomeController : Controller
     // Update the Index action to populate and return the DashboardViewModel
     public IActionResult Index()
     {
+        var userRole = HttpContext.Session.GetString("UserRole");
+        
+        if (string.IsNullOrEmpty(userRole))
+        {
+            return RedirectToAction("SelectRole", "Account");
+        }
+        
         var model = _claimService.GetDashboardStats();  // Fetch stats from the service
         return View(model);  // Pass the model to the view
     }
