@@ -1,26 +1,182 @@
+﻿@model IEnumerable<CMCSPrototype.Models.Claim>
+﻿@using CMCSPrototype.Models
+﻿
 ﻿@{
-    ViewData["Title"] = "Approve Claims";
-}
-<h2>Approve or Reject Claims</h2>
-<table border="1" cellpadding="5">
-    <tr>
-        <th>Claim ID</th>
-        <th>Lecturer Name</th>
-        <th>Hours Worked</th>
-        <th>Total Amount</th>
-        <th>Status</th>
-        <th>Actions</th>
-    </tr>
-    <tr>
-        <td>001</td>
-        <td>Tasha Doe</td>
-        <td>40</td>
-        <td>$2000</td>
-        <td>Pending</td>
-        <td>
-            <button disabled>Approve</button>
-            <button disabled>Reject</button>
-        </td>
-    </tr>
-    <!-- Add more rows as needed -->
-</table>
+﻿    ViewData["Title"] = "Approve Claims";
+﻿    var role = Context.Session.GetString("UserRole");
+﻿}
+﻿
+﻿<div class="container mt-4">
+﻿    <h2><i class="fas fa-check-circle"></i> @(role == "Coordinator" ? "Verify" : "Approve") Claims</h2>
+﻿    <hr />
+﻿
+﻿    @if (string.IsNullOrEmpty(role))
+﻿    {
+﻿        <div class="alert alert-danger">
+﻿            <i class="fas fa-exclamation-triangle"></i> Please <a asp-controller="Account" asp-action="SelectRole">select a role</a> to continue.
+﻿        </div>
+﻿    }
+﻿    else
+﻿    {
+﻿        <div class="alert alert-info">
+﻿            <i class="fas fa-info-circle"></i> You are logged in as: <strong>@role</strong>
+﻿            @if (role == "Coordinator")
+﻿            {
+﻿                <p class="mb-0">You can verify claims that are in <strong>Pending</strong> status. After your verification, claims will require final approval from a Manager.</p>
+﻿            }
+﻿            else if (role == "Manager")
+﻿            {
+﻿                <p class="mb-0">You can approve claims that have been verified by a Coordinator (<strong>Verified</strong> status).</p>
+﻿            }
+﻿        </div>
+﻿
+﻿        @if (Model != null && Model.Any())
+﻿        {
+﻿            <div class="card">
+﻿                <div class="card-header bg-primary text-white">
+﻿                    <h5 class="mb-0"><i class="fas fa-list"></i> Claims Awaiting Your Action</h5>
+﻿                </div>
+﻿                <div class="card-body">
+﻿                    <div class="table-responsive">
+﻿                        <table class="table table-striped table-hover">
+﻿                            <thead class="thead-dark">
+﻿                                <tr>
+﻿                                    <th>ID</th>
+﻿                                    <th>Lecturer</th>
+﻿                                    <th>Total</th>
+﻿                                    <th>Status</th>
+﻿                                    <th>Submitted</th>
+﻿                                    <th>Actions</th>
+﻿                                </tr>
+﻿                            </thead>
+﻿                            <tbody>
+﻿                                @foreach (var claim in Model)
+﻿                                {
+﻿                                    <tr>
+﻿                                        <td><strong>#@claim.Id</strong></td>
+﻿                                        <td>@claim.LecturerName</td>
+﻿                                        <td><strong>R @claim.TotalAmount.ToString("N2")</strong></td>
+﻿                                        <td>
+﻿                                            @if (claim.Status == ClaimStatus.Pending)
+﻿                                            {
+﻿                                                <span class="badge badge-warning">
+﻿                                                    <i class="fas fa-clock"></i> Pending
+﻿                                                </span>
+﻿                                            }
+﻿                                            else if (claim.Status == ClaimStatus.Verified)
+﻿                                            {
+﻿                                                <span class="badge badge-info">
+﻿                                                    <i class="fas fa-check"></i> Verified
+﻿                                                </span>
+﻿                                            }
+﻿                                        </td>
+﻿                                        <td>@claim.SubmittedAt.ToString("dd MMM yyyy")</td>
+﻿                                        <td>
+﻿                                            <a asp-action="ClaimDetails" asp-route-id="@claim.Id" class="btn btn-sm btn-info mb-1">
+﻿                                                <i class="fas fa-eye"></i> Details
+﻿                                            </a>
+﻿                                            <button type="button" class="btn btn-sm btn-success mb-1" data-toggle="modal" 
+﻿                                                    data-target="#approveModal@claim.Id">
+﻿                                                <i class="fas fa-check"></i> @(role == "Coordinator" ? "Verify" : "Approve")
+﻿                                            </button>
+﻿                                            <button type="button" class="btn btn-sm btn-danger mb-1" data-toggle="modal" 
+﻿                                                    data-target="#rejectModal@claim.Id">
+﻿                                                <i class="fas fa-times"></i> Reject
+﻿                                            </button>
+﻿                                        </td>
+﻿                                    </tr>
+﻿                                }
+﻿                            </tbody>
+﻿                        </table>
+﻿                    </div>
+﻿                </div>
+﻿            </div>
+﻿
+﻿            <!-- Modals for each claim -->
+﻿            @foreach (var claim in Model)
+﻿            {
+﻿                <!-- Approve Modal -->
+﻿                <div class="modal fade" id="approveModal@claim.Id" tabindex="-1" role="dialog">
+﻿                    <div class="modal-dialog" role="document">
+﻿                        <div class="modal-content">
+﻿                            <div class="modal-header bg-success text-white">
+﻿                                <h5 class="modal-title">
+﻿                                    <i class="fas fa-check"></i> @(role == "Coordinator" ? "Verify" : "Approve") Claim #@claim.Id
+﻿                                </h5>
+﻿                                <button type="button" class="close text-white" data-dismiss="modal">
+﻿                                    <span>&times;</span>
+﻿                                </button>
+﻿                            </div>
+﻿                            <form asp-action="Approve" method="post">
+﻿                                <div class="modal-body">
+﻿                                    <input type="hidden" name="id" value="@claim.Id" />
+﻿                                    <input type="hidden" name="approverName" value="@role" />
+﻿                                    
+﻿                                    <p>Are you sure you want to @(role == "Coordinator" ? "verify" : "approve") this claim?</p>
+﻿                                    <p><strong>Lecturer:</strong> @claim.LecturerName</p>
+﻿                                    <p><strong>Amount:</strong> R @claim.TotalAmount.ToString("N2")</p>
+﻿                                    
+﻿                                    <div class="form-group">
+﻿                                        <label for="comments@claim.Id">Comments (Optional):</label>
+﻿                                        <textarea name="comments" id="comments@claim.Id" class="form-control" rows="3" 
+﻿                                                  placeholder="Add any comments about this approval"></textarea>
+﻿                                    </div>
+﻿                                </div>
+﻿                                <div class="modal-footer">
+﻿                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+﻿                                    <button type="submit" class="btn btn-success">
+﻿                                        <i class="fas fa-check"></i> @(role == "Coordinator" ? "Verify" : "Approve")
+﻿                                    </button>
+﻿                                </div>
+﻿                            </form>
+﻿                        </div>
+﻿                    </div>
+﻿                </div>
+﻿
+﻿                <!-- Reject Modal -->
+﻿                <div class="modal fade" id="rejectModal@claim.Id" tabindex="-1" role="dialog">
+﻿                    <div class="modal-dialog" role="document">
+﻿                        <div class="modal-content">
+﻿                            <div class="modal-header bg-danger text-white">
+﻿                                <h5 class="modal-title">
+﻿                                    <i class="fas fa-times"></i> Reject Claim #@claim.Id
+﻿                                </h5>
+﻿                                <button type="button" class="close text-white" data-dismiss="modal">
+﻿                                    <span>&times;</span>
+﻿                                </button>
+﻿                            </div>
+﻿                            <form asp-action="Reject" method="post">
+﻿                                <div class="modal-body">
+﻿                                    <input type="hidden" name="id" value="@claim.Id" />
+﻿                                    <input type="hidden" name="rejectorName" value="@role" />
+﻿                                    
+﻿                                    <p>Are you sure you want to reject this claim?</p>
+﻿                                    <p><strong>Lecturer:</strong> @claim.LecturerName</p>
+﻿                                    <p><strong>Amount:</strong> R @claim.TotalAmount.ToString("N2")</p>
+﻿                                    
+﻿                                    <div class="form-group">
+﻿                                        <label for="reason@claim.Id">Rejection Reason (Required):</label>
+﻿                                        <textarea name="reason" id="reason@claim.I  d" class="form-control" rows="3" 
+﻿                                                  placeholder="Explain why this claim is being rejected" required></textarea>
+﻿                                    </div>
+﻿                                </div>
+﻿                                <div class="modal-footer">
+﻿                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+﻿                                    <button type="submit" class="btn btn-danger">
+﻿                                        <i class="fas fa-times"></i> Reject
+﻿                                    </button>
+﻿                                </div>
+﻿                            </form>
+﻿                        </div>
+﻿                    </div>
+﻿                </div>
+﻿            }
+﻿        }
+﻿        else
+﻿        {
+﻿            <div class="alert alert-info">
+﻿                <i class="fas fa-info-circle"></i> No claims require your attention at this time.
+﻿            </div>
+﻿        }
+﻿    }
+﻿</div>
