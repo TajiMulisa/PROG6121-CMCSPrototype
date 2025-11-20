@@ -1,0 +1,174 @@
+@model CMCSPrototype.Models.ReportViewModel
+
+@{
+    ViewData["Title"] = "Lecturer Reports";
+}
+
+<div class="container mt-4">
+    <h2><i class="fas fa-users"></i> Lecturer Performance Reports</h2>
+    <hr />
+
+    <!-- Overall Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <h3>@(Model.LecturerReports?.Count ?? 0)</h3>
+                    <p class="mb-0">Total Lecturers</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>@Model.TotalClaims</h3>
+                    <p class="mb-0">Total Claims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>@Model.ApprovedClaims</h3>
+                    <p class="mb-0">Approved Claims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>R @Model.TotalApprovedAmount.ToString("N2")</h3>
+                    <p class="mb-0">Total Approved</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lecturer Details Table -->
+    @if (Model.LecturerReports != null && Model.LecturerReports.Any())
+    {
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-table"></i> Lecturer Performance Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Lecturer Name</th>
+                                <th class="text-center">Total Claims</th>
+                                <th class="text-center">Pending</th>
+                                <th class="text-center">Approved</th>
+                                <th class="text-center">Rejected</th>
+                                <th class="text-right">Total Amount</th>
+                                <th class="text-right">Approved Amount</th>
+                                <th class="text-center">Approval Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lecturer in Model.LecturerReports.OrderByDescending(l => l.TotalAmount))
+                            {
+                                var pendingCount = lecturer.TotalClaims - lecturer.ApprovedClaims - lecturer.RejectedClaims;
+                                var approvalRate = lecturer.TotalClaims > 0 
+                                    ? (lecturer.ApprovedClaims * 100.0 / lecturer.TotalClaims) 
+                                    : 0;
+                                <tr>
+                                    <td><strong>@lecturer.LecturerName</strong></td>
+                                    <td class="text-center">
+                                        <span class="badge badge-primary">@lecturer.TotalClaims</span>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (pendingCount > 0)
+                                        {
+                                            <span class="badge badge-warning">@pendingCount</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">0</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (lecturer.ApprovedClaims > 0)
+                                        {
+                                            <span class="badge badge-success">@lecturer.ApprovedClaims</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">0</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (lecturer.RejectedClaims > 0)
+                                        {
+                                            <span class="badge badge-danger">@lecturer.RejectedClaims</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">0</span>
+                                        }
+                                    </td>
+                                    <td class="text-right">
+                                        <strong>R @lecturer.TotalAmount.ToString("N2")</strong>
+                                    </td>
+                                    <td class="text-right text-success">
+                                        <strong>R @lecturer.ApprovedAmount.ToString("N2")</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        @if (approvalRate >= 80)
+                                        {
+                                            <span class="badge badge-success">@approvalRate.ToString("F1")%</span>
+                                        }
+                                        else if (approvalRate >= 50)
+                                        {
+                                            <span class="badge badge-warning">@approvalRate.ToString("F1")%</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge badge-danger">@approvalRate.ToString("F1")%</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="thead-light">
+                            <tr>
+                                <th>Total</th>
+                                <th class="text-center">@Model.TotalClaims</th>
+                                <th class="text-center">@Model.PendingClaims</th>
+                                <th class="text-center">@Model.ApprovedClaims</th>
+                                <th class="text-center">@Model.RejectedClaims</th>
+                                <th class="text-right">R @(Model.TotalApprovedAmount + Model.TotalPendingAmount + Model.TotalRejectedAmount).ToString("N2")</th>
+                                <th class="text-right">R @Model.TotalApprovedAmount.ToString("N2")</th>
+                                <th class="text-center">
+                                    @{
+                                        var overallRate = Model.TotalClaims > 0 
+                                            ? (Model.ApprovedClaims * 100.0 / Model.TotalClaims) 
+                                            : 0;
+                                    }
+                                    @overallRate.ToString("F1")%
+                                </th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No lecturer reports available.
+        </div>
+    }
+
+    <!-- Action Buttons -->
+    <div class="text-center mt-4">
+        <a href="@Url.Action("Index", "Reports")" class="btn btn-primary">
+            <i class="fas fa-chart-bar"></i> Back to All Reports
+        </a>
+        <a href="@Url.Action("Index", "Home")" class="btn btn-secondary">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+    </div>
+</div>

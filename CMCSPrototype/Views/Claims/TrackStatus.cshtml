@@ -1,19 +1,350 @@
-﻿@{
+﻿@model IEnumerable<CMCSPrototype.Models.Claim>
+@using CMCSPrototype.Models
+
+@{
     ViewData["Title"] = "Track Claim Status";
+    var userName = Context.Session.GetString("UserName");
+    var userRole = Context.Session.GetString("UserRole");
 }
-<h2>Track Your Claim Status</h2>
-<table border="1" cellpadding="5">
-    <tr>
-        <th>Claim ID</th>
-        <th>Status</th>
-        <th>Submission Date</th>
-        <th>Documents</th>
-    </tr>
-    <tr>
-        <td>001</td>
-        <td>Approved</td>
-        <td>2024-06-01</td>
-        <td><a href="#">View Documents</a></td>
-    </tr>
-    <!-- Add more rows -->
-</table>
+
+<div class="container mt-4">
+    <h2><i class="fas fa-tasks"></i> Track Claim Status</h2>
+    <hr />
+
+    @if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(userRole))
+    {
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> Please <a asp-controller="Account" asp-action="SelectRole">select a role</a> to view claims.
+        </div>
+    }
+    else
+    {
+        <div class="mb-3">
+            @if (userRole == "Lecturer")
+            {
+                <a asp-action="SubmitClaim" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Submit New Claim
+                </a>
+                <span class="ml-3">Viewing your claims: <strong>@userName</strong> <span class="badge badge-primary">@userRole</span></span>
+            }
+            else
+            {
+                <span class="ml-3">Viewing all claims as: <strong>@userName</strong> <span class="badge badge-success">@userRole</span></span>
+            }
+        </div>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-list"></i> Your Claims</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Claim ID</th>
+                                    <th>Lecturer</th>
+                                    <th>Hours</th>
+                                    <th>Rate</th>
+                                    <th>Total Amount</th>
+                                    <th>Status</th>
+                                    <th>Approval Progress</th>
+                                    <th>Submission Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var claim in Model.OrderByDescending(c => c.SubmissionDate))
+                                {
+                                    <tr>
+                                        <td><strong>#@claim.Id</strong></td>
+                                        <td>@claim.LecturerName</td>
+                                        <td>@claim.HoursWorked hrs</td>
+                                        <td>R @claim.HourlyRate.ToString("N2")</td>
+                                        <td><strong>R @claim.TotalAmount.ToString("N2")</strong></td>
+                                        <td>
+                                            @if (claim.Status == ClaimStatus.Pending)
+                                            {
+                                                <span class="badge badge-warning badge-lg">
+                                                    <i class="fas fa-clock"></i> Pending
+                                                </span>
+                                            }
+                                            else if (claim.Status == ClaimStatus.Approved)
+                                            {
+                                                <span class="badge badge-info badge-lg">
+                                                    <i class="fas fa-check"></i> Coordinator Approved
+                                                </span>
+                                            }
+                                            else if (claim.Status == ClaimStatus.Approved)
+                                            {
+                                                <span class="badge badge-success badge-lg">
+                                                    <i class="fas fa-check-double"></i> Fully Approved
+                                                </span>
+                                            }
+                                            else if (claim.Status == ClaimStatus.Rejected)
+                                            {
+                                                <span class="badge badge-danger badge-lg">
+                                                    <i class="fas fa-times"></i> Rejected
+                                                </span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="approval-progress">
+                                                @{
+                                                    var coordinatorDone = !string.IsNullOrEmpty(claim.CoordinatorApprovedBy);
+                                                    var managerDone = !string.IsNullOrEmpty(claim.ManagerApprovedBy);
+                                                    var isRejected = claim.Status == ClaimStatus.Rejected;
+                                                }
+                                                
+                                                @if (isRejected)
+                                                {
+                                                    <small class="text-danger">
+                                                        <i class="fas fa-times-circle"></i> Rejected by @claim.RejectedBy
+                                                    </small>
+                                                }
+                                                else
+                                                {
+                                                    <small>
+                                                        <i class="fas @(coordinatorDone ? "fa-check-circle text-success" : "fa-circle text-muted")"></i> Coordinator
+                                                        @if (coordinatorDone)
+                                                        {
+                                                            <span class="text-muted">(@claim.CoordinatorApprovedAt?.ToString("dd MMM"))</span>
+                                                        }
+                                                        <br/>
+                                                        <i class="fas @(managerDone ? "fa-check-circle text-success" : "fa-circle text-muted")"></i> Manager
+                                                        @if (managerDone)
+                                                        {
+                                                            <span class="text-muted">(@claim.ManagerApprovedAt?.ToString("dd MMM"))</span>
+                                                        }
+                                                    </small>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td>@claim.SubmissionDate.ToString("dd MMM yyyy")</td>
+                                        <td>
+                                            <a asp-action="ClaimDetails" asp-route-id="@claim.Id" class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-secondary" data-toggle="modal" 
+                                                    data-target="#claimModal@claim.Id">
+                                                <i class="fas fa-info-circle"></i> Quick View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modals for each claim -->
+            @foreach (var claim in Model)
+            {
+                <div class="modal fade" id="claimModal@claim.Id" tabindex="-1" role="dialog">
+                    <div class="modal-dialog modal-lg" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-file-invoice"></i> Claim Details - #@claim.Id
+                                </h5>
+                                <button type="button" class="close text-white" data-dismiss="modal">
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Lecturer Name:</strong> @claim.LecturerName</p>
+                                        <p><strong>Hours Worked:</strong> @claim.HoursWorked hrs</p>
+                                        <p><strong>Hourly Rate:</strong> R @claim.HourlyRate.ToString("N2")</p>
+                                        <p><strong>Total Amount:</strong> <span class="text-primary h4">R @claim.TotalAmount.ToString("N2")</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Status:</strong> 
+                                            @if (claim.Status == ClaimStatus.Pending)
+                                            {
+                                                <span class="badge badge-warning">Pending</span>
+                                            }
+                                            else if (claim.Status == ClaimStatus.Approved)
+                                            {
+                                                <span class="badge badge-info">Coordinator Approved</span>
+                                            }
+                                            else if (claim.Status == ClaimStatus.Approved)
+                                            {
+                                                <span class="badge badge-success">Fully Approved</span>
+                                            }
+                                            else if (claim.Status == ClaimStatus.Rejected)
+                                            {
+                                                <span class="badge badge-danger">Rejected</span>
+                                            }
+                                        </p>
+                                        <p><strong>Submission Date:</strong> @claim.SubmissionDate.ToString("dd MMM yyyy HH:mm")</p>
+                                    </div>
+                                </div>
+                                
+                                @if (!string.IsNullOrEmpty(claim.Notes))
+                                {
+                                    <hr />
+                                    <p><strong>Notes:</strong></p>
+                                    <div class="alert alert-light">
+                                        @claim.Notes
+                                    </div>
+                                }
+
+                                <hr />
+                                <h6><strong><i class="fas fa-clipboard-check"></i> Approval Timeline:</strong></h6>
+                                
+                                <!-- Approval Timeline -->
+                                <div class="timeline mt-3">
+                                    <!-- Submission -->
+                                    <div class="timeline-item">
+                                        <i class="fas fa-paper-plane text-primary"></i>
+                                        <strong>Claim Submitted</strong>
+                                        <div class="text-muted small">@claim.SubmittedAt.ToString("dd MMM yyyy HH:mm")</div>
+                                    </div>
+
+                                    <!-- Coordinator Approval -->
+                                    @if (!string.IsNullOrEmpty(claim.CoordinatorApprovedBy))
+                                    {
+                                        <div class="timeline-item">
+                                            <i class="fas fa-check-circle text-success"></i>
+                                            <strong>Coordinator Approved</strong>
+                                            <div class="text-muted small">
+                                                By: @claim.CoordinatorApprovedBy<br/>
+                                                Date: @claim.CoordinatorApprovedAt?.ToString("dd MMM yyyy HH:mm")
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(claim.CoordinatorApprovalComments))
+                                            {
+                                                <div class="alert alert-success mt-2 mb-2">
+                                                    <strong>Comments:</strong> @claim.CoordinatorApprovalComments
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else if (claim.Status == ClaimStatus.Pending)
+                                    {
+                                        <div class="timeline-item">
+                                            <i class="fas fa-hourglass-half text-warning"></i>
+                                            <strong>Awaiting Coordinator Approval</strong>
+                                        </div>
+                                    }
+
+                                    <!-- Manager Approval -->
+                                    @if (!string.IsNullOrEmpty(claim.ManagerApprovedBy))
+                                    {
+                                        <div class="timeline-item">
+                                            <i class="fas fa-check-circle text-success"></i>
+                                            <strong>Manager Approved (Final)</strong>
+                                            <div class="text-muted small">
+                                                By: @claim.ManagerApprovedBy<br/>
+                                                Date: @claim.ManagerApprovedAt?.ToString("dd MMM yyyy HH:mm")
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(claim.ManagerApprovalComments))
+                                            {
+                                                <div class="alert alert-success mt-2 mb-2">
+                                                    <strong>Comments:</strong> @claim.ManagerApprovalComments
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else if (claim.Status == ClaimStatus.Approved)
+                                    {
+                                        <div class="timeline-item">
+                                            <i class="fas fa-hourglass-half text-warning"></i>
+                                            <strong>Awaiting Manager Approval</strong>
+                                        </div>
+                                    }
+
+                                    <!-- Rejection -->
+                                    @if (!string.IsNullOrEmpty(claim.RejectedBy))
+                                    {
+                                        <div class="timeline-item">
+                                            <i class="fas fa-times-circle text-danger"></i>
+                                            <strong>Claim Rejected</strong>
+                                            <div class="text-muted small">
+                                                By: @claim.RejectedBy<br/>
+                                                Date: @claim.RejectedAt?.ToString("dd MMM yyyy HH:mm")
+                                            </div>
+                                            <div class="alert alert-danger mt-2 mb-2">
+                                                <strong><i class="fas fa-exclamation-circle"></i> Rejection Reason:</strong><br/>
+                                                @claim.RejectionReason
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (claim.Documents != null && claim.Documents.Any())
+                                {
+                                    <hr />
+                                    <h6><strong><i class="fas fa-paperclip"></i> Supporting Documents:</strong></h6>
+                                    <ul class="list-group">
+                                        @foreach (var doc in claim.Documents)
+                                        {
+                                            <li class="list-group-item">
+                                                <i class="fas fa-file"></i> @doc.FileName 
+                                                <span class="badge badge-secondary">@((doc.FileSize / 1024.0).ToString("N2")) KB</span>
+                                                <small class="text-muted d-block">Uploaded: @doc.UploadedAt.ToString("dd MMM yyyy HH:mm")</small>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <hr />
+                                    <p class="text-muted"><i class="fas fa-info-circle"></i> No documents attached to this claim.</p>
+                                }
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> You have no claims yet. 
+                <a asp-action="SubmitClaim" class="alert-link">Submit your first claim</a> to get started.
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    
+    .timeline-item {
+        position: relative;
+        padding-bottom: 20px;
+        padding-left: 15px;
+        border-left: 2px solid #dee2e6;
+    }
+    
+    .timeline-item:last-child {
+        border-left: 0;
+    }
+    
+    .timeline-item i {
+        position: absolute;
+        left: -10px;
+        background: white;
+        padding: 2px;
+    }
+    
+    .approval-progress {
+        line-height: 1.8;
+    }
+    
+    .badge-lg {
+        font-size: 0.9em;
+        padding: 0.4em 0.6em;
+    }
+</style>

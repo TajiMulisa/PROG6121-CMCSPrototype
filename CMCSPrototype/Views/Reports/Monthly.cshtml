@@ -1,0 +1,130 @@
+@model CMCSPrototype.Models.ReportViewModel
+
+@{
+    ViewData["Title"] = "Monthly Report";
+    var year = ViewBag.Year ?? DateTime.Now.Year;
+    var month = ViewBag.Month ?? DateTime.Now.Month;
+    var monthName = new DateTime(year, month, 1).ToString("MMMM yyyy");
+}
+
+<div class="container mt-4">
+    <h2><i class="fas fa-calendar-alt"></i> Monthly Report - @monthName</h2>
+    <hr />
+
+    <!-- Month/Year Selector -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="@Url.Action("Monthly", "Reports")" class="form-inline">
+                <div class="form-group mr-3">
+                    <label for="year" class="mr-2">Year:</label>
+                    <select name="year" id="year" class="form-control">
+                        @for (int y = DateTime.Now.Year; y >= DateTime.Now.Year - 5; y--)
+                        {
+                            <option value="@y" selected="@(y == year)">@y</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group mr-3">
+                    <label for="month" class="mr-2">Month:</label>
+                    <select name="month" id="month" class="form-control">
+                        @for (int m = 1; m <= 12; m++)
+                        {
+                            var monthDate = new DateTime(2000, m, 1);
+                            <option value="@m" selected="@(m == month)">@monthDate.ToString("MMMM")</option>
+                        }
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> View Report
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>@Model.TotalClaims</h3>
+                    <p class="mb-0">Total Claims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h3>@Model.PendingClaims</h3>
+                    <p class="mb-0">Pending</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>@Model.ApprovedClaims</h3>
+                    <p class="mb-0">Approved</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body text-center">
+                    <h3>@Model.RejectedClaims</h3>
+                    <p class="mb-0">Rejected</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Breakdown -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-dollar-sign"></i> Approved Amount
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-success">R @Model.TotalApprovedAmount.ToString("N2")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-clock"></i> Pending Amount
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-warning">R @Model.TotalPendingAmount.ToString("N2")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <i class="fas fa-times"></i> Rejected Amount
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-danger">R @Model.TotalRejectedAmount.ToString("N2")</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.TotalClaims == 0)
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No claims found for @monthName.
+        </div>
+    }
+
+    <!-- Action Buttons -->
+    <div class="text-center mt-4">
+        <a href="@Url.Action("Index", "Reports")" class="btn btn-primary">
+            <i class="fas fa-chart-bar"></i> Back to All Reports
+        </a>
+        <a href="@Url.Action("Index", "Home")" class="btn btn-secondary">
+            <i class="fas fa-home"></i> Dashboard
+        </a>
+    </div>
+</div>

@@ -63,6 +63,7 @@ namespace CMCSPrototype.Services
         public List<LecturerReport> GetLecturerReports()
         {
             var lecturerReports = _context.Claims
+                .ToList() // Materialize to memory first to allow access to computed TotalAmount property
                 .GroupBy(c => c.LecturerName)
                 .Select(g => new LecturerReport
                 {

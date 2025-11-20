@@ -1,0 +1,172 @@
+@model CMCSPrototype.Models.ReportViewModel
+
+@{
+    ViewData["Title"] = "Reports & Analytics";
+}
+
+<div class="container mt-4">
+    <h2><i class="fas fa-chart-bar"></i> Reports & Analytics</h2>
+    <hr />
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>@Model.TotalClaims</h3>
+                    <p class="mb-0">Total Claims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h3>@Model.PendingClaims</h3>
+                    <p class="mb-0">Pending Claims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>@Model.ApprovedClaims</h3>
+                    <p class="mb-0">Approved Claims</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body text-center">
+                    <h3>@Model.RejectedClaims</h3>
+                    <p class="mb-0">Rejected Claims</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-check-circle"></i> Approved Amount
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-success">R @Model.TotalApprovedAmount.ToString("N2")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-clock"></i> Pending Amount
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-warning">R @Model.TotalPendingAmount.ToString("N2")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <i class="fas fa-times-circle"></i> Rejected Amount
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="text-danger">R @Model.TotalRejectedAmount.ToString("N2")</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Reports -->
+    @if (Model.MonthlyReports.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-calendar-alt"></i> Monthly Breakdown (@DateTime.Now.Year)
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Total Claims</th>
+                                <th>Approved</th>
+                                <th>Rejected</th>
+                                <th>Total Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var monthReport in Model.MonthlyReports)
+                            {
+                                <tr>
+                                    <td><strong>@monthReport.Month</strong></td>
+                                    <td>@monthReport.ClaimsCount</td>
+                                    <td><span class="badge badge-success">@monthReport.ApprovedCount</span></td>
+                                    <td><span class="badge badge-danger">@monthReport.RejectedCount</span></td>
+                                    <td><strong>R@monthReport.TotalAmount.ToString("N2")</strong></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Lecturer Reports -->
+    @if (Model.LecturerReports.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="fas fa-user-tie"></i> Lecturer Performance
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Lecturer Name</th>
+                                <th>Total Claims</th>
+                                <th>Approved</th>
+                                <th>Rejected</th>
+                                <th>Total Amount</th>
+                                <th>Approved Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var lecturerReport in Model.LecturerReports)
+                            {
+                                <tr>
+                                    <td><strong>@lecturerReport.LecturerName</strong></td>
+                                    <td>@lecturerReport.TotalClaims</td>
+                                    <td><span class="badge badge-success">@lecturerReport.ApprovedClaims</span></td>
+                                    <td><span class="badge badge-danger">@lecturerReport.RejectedClaims</span></td>
+                                    <td><strong>R@lecturerReport.TotalAmount.ToString("N2")</strong></td>
+                                    <td class="text-success"><strong>R@lecturerReport.ApprovedAmount.ToString("N2")</strong></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> No claim data available yet. Submit some claims to see reports.
+        </div>
+    }
+
+    <!-- Action Buttons -->
+    <div class="text-center mb-4">
+        <a href="@Url.Action("Index", "Home")" class="btn btn-primary">
+            <i class="fas fa-home"></i> Back to Dashboard
+        </a>
+        <a href="@Url.Action("Monthly", "Reports")" class="btn btn-info">
+            <i class="fas fa-calendar"></i> View Monthly Report
+        </a>
+    </div>
+</div>
