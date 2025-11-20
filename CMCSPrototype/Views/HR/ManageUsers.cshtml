@@ -1,0 +1,125 @@
+@model List<CMCSPrototype.Models.User>
+@{
+    ViewData["Title"] = "Manage Users";
+}
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="bi bi-people-fill"></i> Manage Users</h2>
+            <p class="text-muted">View, edit, and manage all system users</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="@Url.Action("CreateUser", "HR")" class="btn btn-primary">
+                <i class="bi bi-person-plus-fill"></i> Create New User
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Hourly Rate</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in Model)
+                            {
+                                <tr>
+                                    <td>@user.Id</td>
+                                    <td>@user.FullName</td>
+                                    <td>@user.Email</td>
+                                    <td>
+                                        @switch (user.Role)
+                                        {
+                                            case CMCSPrototype.Models.UserRole.Lecturer:
+                                                <span class="badge bg-primary">Lecturer</span>
+                                                break;
+                                            case CMCSPrototype.Models.UserRole.Coordinator:
+                                                <span class="badge bg-info">Coordinator</span>
+                                                break;
+                                            case CMCSPrototype.Models.UserRole.Manager:
+                                                <span class="badge bg-warning">Manager</span>
+                                                break;
+                                            case CMCSPrototype.Models.UserRole.HR:
+                                                <span class="badge bg-danger">HR</span>
+                                                break;
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (user.HourlyRate.HasValue)
+                                        {
+                                            <strong>@user.HourlyRate.Value.ToString("C")</strong>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">N/A</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (user.IsActive)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        }
+                                    </td>
+                                    <td>@user.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="@Url.Action("EditUser", "HR", new { id = user.Id })" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="Edit">
+                                                <i class="bi bi-pencil-fill"></i>
+                                            </a>
+                                            <form asp-action="ToggleUserStatus" asp-route-id="@user.Id" method="post" style="display: inline;">
+                                                @if (user.IsActive)
+                                                {
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Deactivate">
+                                                        <i class="bi bi-pause-circle-fill"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Activate">
+                                                        <i class="bi bi-play-circle-fill"></i>
+                                                    </button>
+                                                }
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle-fill"></i> No users found. Create your first user to get started.
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a href="@Url.Action("Index", "HR")" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>

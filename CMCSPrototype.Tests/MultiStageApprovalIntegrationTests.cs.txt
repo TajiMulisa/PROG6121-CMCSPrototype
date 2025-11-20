@@ -1,0 +1,256 @@
+using Xunit;
+using Microsoft.EntityFrameworkCore;
+using CMCSPrototype.Data;
+using CMCSPrototype.Models;
+using CMCSPrototype.Services;
+using Moq;
+
+namespace CMCSPrototype.Tests
+{
+    public class MultiStageApprovalIntegrationTests
+    {
+        private AppDbContext GetInMemoryDbContext()
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .Options;
+
+            return new AppDbContext(options);
+        }
+
+        private Mock<ILoggingService> GetMockLoggingService()
+        {
+            return new Mock<ILoggingService>();
+        }
+
+        [Fact]
+        public async Task CompleteWorkflow_Lecturer_Coordinator_Admin_Should_FullyApproveClaim()
+        {
+            // Arrange
+            var context = GetInMemoryDbContext();
+            var mockLogger = GetMockLoggingService();
+            var claimService = new ClaimService(context, mockLogger.Object);
+
+            // Step 1: Lecturer submits claim
+            var claim = new Claim
+            {
+                LecturerName = "John Lecturer",
+                HoursWorked = 40,
+                HourlyRate = 500,
+                Notes = "October teaching hours",
+                SubmissionDate = DateTime.Now
+            };
+
+            await claimService.SubmitClaim(claim);
+
+            var submittedClaim = await context.Claims.FirstOrDefaultAsync(c => c.LecturerName == "John Lecturer");
+            Assert.NotNull(submittedClaim);
+            Assert.Equal(ClaimStatus.Pending, submittedClaim.Status);
+
+            // Step 2: Coordinator approves
+            await claimService.ApproveClaim(submittedClaim.Id, "Coordinator", "Verified hours and rate");
+
+            var coordinatorApprovedClaim = await context.Claims.FirstOrDefaultAsync(c => c.Id == submittedClaim.Id);
+            Assert.NotNull(coordinatorApprovedClaim);
+            Assert.Equal(ClaimStatus.CoordinatorApproved, coordinatorApprovedClaim.Status);
+            Assert.Equal("Coordinator", coordinatorApprovedClaim.CoordinatorApprovedBy);
+            Assert.NotNull(coordinatorApprovedClaim.CoordinatorApprovedAt);
+            Assert.Equal("Verified hours and rate", coordinatorApprovedClaim.CoordinatorApprovalComments);
+
+            // Step 3: Admin gives final approval
+            await claimService.ApproveClaim(submittedClaim.Id, "Admin", "Budget approved, ready for payment");
+
+            var finalClaim = await context.Claims.FirstOrDefaultAsync(c => c.Id == submittedClaim.Id);
+            Assert.NotNull(finalClaim);
+            Assert.Equal(ClaimStatus.Approved, finalClaim.Status);
+            Assert.Equal("Admin", finalClaim.AdminApprovedBy);
+            Assert.NotNull(finalClaim.AdminApprovedAt);
+            Assert.Equal("Budget approved, ready for payment", finalClaim.AdminApprovalComments);
+
+            // Verify both approvals are recorded
+            Assert.Equal("Coordinator", finalClaim.CoordinatorApprovedBy);
+            Assert.Equal("Admin", finalClaim.AdminApprovedBy);
+        }
+
+        [Fact]
+        public async Task CompleteWorkflow_Rejection_At_Coordinator_Level_Should_Reject_Claim()
+        {
+            // Arrange
+            var context = GetInMemoryDbContext();
+            var mockLogger = GetMockLoggingService();
+            var claimService = new ClaimService(context, mockLogger.Object);
+
+            // Step 1: Lecturer submits claim
+            var claim = new Claim
+            {
+                LecturerName = "Jane Lecturer",
+                HoursWorked = 100,
+                HourlyRate = 800,
+                SubmissionDate = DateTime.Now
+            };
+
+            await claimService.SubmitClaim(claim);
+            var submittedClaim = await context.Claims.FirstAsync();
+
+            // Step 2: Coordinator rejects
+            await claimService.RejectClaim(submittedClaim.Id, "Coordinator", "Hours exceed approved limit");
+
+            var rejectedClaim = await context.Claims.FirstOrDefaultAsync(c => c.Id == submittedClaim.Id);
+            Assert.NotNull(rejectedClaim);
+            Assert.Equal(ClaimStatus.Rejected, rejectedClaim.Status);
+            Assert.Equal("Coordinator", rejectedClaim.RejectedBy);
+            Assert.Equal("Hours exceed approved limit", rejectedClaim.RejectionReason);
+            Assert.NotNull(rejectedClaim.RejectedAt);
+        }
+
+        [Fact]
+        public async Task CompleteWorkflow_Rejection_At_Admin_Level_Should_Reject_Claim()
+        {
+            // Arrange
+            var context = GetInMemoryDbContext();
+            var mockLogger = GetMockLoggingService();
+            var claimService = new ClaimService(context, mockLogger.Object);
+
+            // Submit and get coordinator approval
+            var claim = new Claim
+            {
+                LecturerName = "Bob Lecturer",
+                HoursWorked = 50,
+                HourlyRate = 600,
+                SubmissionDate = DateTime.Now
+            };
+
+            await claimService.SubmitClaim(claim);
+            var submittedClaim = await context.Claims.FirstAsync();
+            await claimService.ApproveClaim(submittedClaim.Id, "Coordinator", "Approved");
+
+            // Admin rejects despite coordinator approval
+            await claimService.RejectClaim(submittedClaim.Id, "Admin", "Budget constraints for this period");
+
+            var rejectedClaim = await context.Claims.FirstOrDefaultAsync(c => c.Id == submittedClaim.Id);
+            Assert.NotNull(rejectedClaim);
+            Assert.Equal(ClaimStatus.Rejected, rejectedClaim.Status);
+            Assert.Equal("Admin", rejectedClaim.RejectedBy);
+            Assert.Equal("Budget constraints for this period", rejectedClaim.RejectionReason);
+
+            // Coordinator approval should still be recorded
+            Assert.Equal("Coordinator", rejectedClaim.CoordinatorApprovedBy);
+        }
+
+        [Fact]
+        public async Task DocumentsWorkflow_Should_Attach_Documents_To_Claim()
+        {
+            // Arrange
+            var context = GetInMemoryDbContext();
+            var mockLogger = GetMockLoggingService();
+            var claimService = new ClaimService(context, mockLogger.Object);
+
+            // Submit claim
+            var claim = new Claim
+            {
+                LecturerName = "Document Lecturer",
+                HoursWorked = 30,
+                HourlyRate = 400,
+                SubmissionDate = DateTime.Now
+            };
+
+            await claimService.SubmitClaim(claim);
+            var submittedClaim = await context.Claims.FirstAsync();
+
+            // Add multiple documents
+            var doc1 = new Document
+            {
+                FileName = "timesheet.pdf",
+                FilePath = "/uploads/timesheet.pdf",
+                ClaimId = submittedClaim.Id,
+                FileSize = 2048,
+                ContentType = "application/pdf"
+            };
+
+            var doc2 = new Document
+            {
+                FileName = "invoice.docx",
+                FilePath = "/uploads/invoice.docx",
+                ClaimId = submittedClaim.Id,
+                FileSize = 4096,
+                ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            };
+
+            await claimService.AddDocument(doc1);
+            await claimService.AddDocument(doc2);
+
+            // Retrieve claim with documents
+            var claimWithDocs = await context.Claims
+                .Include(c => c.Documents)
+                .FirstOrDefaultAsync(c => c.Id == submittedClaim.Id);
+
+            Assert.NotNull(claimWithDocs);
+            Assert.Equal(2, claimWithDocs.Documents.Count);
+            Assert.Contains(claimWithDocs.Documents, d => d.FileName == "timesheet.pdf");
+            Assert.Contains(claimWithDocs.Documents, d => d.FileName == "invoice.docx");
+        }
+
+        [Fact]
+        public async Task GetPendingClaims_Should_Show_Appropriate_Claims_For_Coordinator()
+        {
+            // Arrange
+            var context = GetInMemoryDbContext();
+            var mockLogger = GetMockLoggingService();
+            var claimService = new ClaimService(context, mockLogger.Object);
+
+            // Create claims in different states
+            await context.Claims.AddRangeAsync(
+                new Claim { LecturerName = "User1", HoursWorked = 10, HourlyRate = 50, Status = ClaimStatus.Pending, SubmissionDate = DateTime.Now },
+                new Claim { LecturerName = "User2", HoursWorked = 10, HourlyRate = 50, Status = ClaimStatus.Pending, SubmissionDate = DateTime.Now },
+                new Claim { LecturerName = "User3", HoursWorked = 10, HourlyRate = 50, Status = ClaimStatus.CoordinatorApproved, SubmissionDate = DateTime.Now },
+                new Claim { LecturerName = "User4", HoursWorked = 10, HourlyRate = 50, Status = ClaimStatus.Approved, SubmissionDate = DateTime.Now },
+                new Claim { LecturerName = "User5", HoursWorked = 10, HourlyRate = 50, Status = ClaimStatus.Rejected, SubmissionDate = DateTime.Now }
+            );
+            await context.SaveChangesAsync();
+
+            // Act
+            var pendingClaims = await claimService.GetPendingClaims();
+
+            // Assert - Should show Pending and CoordinatorApproved (awaiting admin)
+            Assert.Equal(3, pendingClaims.Count);
+            Assert.Equal(2, pendingClaims.Count(c => c.Status == ClaimStatus.Pending));
+            Assert.Equal(1, pendingClaims.Count(c => c.Status == ClaimStatus.CoordinatorApproved));
+        }
+
+        [Fact]
+        public async Task ClaimHistory_Should_Track_All_Status_Changes()
+        {
+            // Arrange
+            var context = GetInMemoryDbContext();
+            var mockLogger = GetMockLoggingService();
+            var claimService = new ClaimService(context, mockLogger.Object);
+
+            // Submit claim
+            var claim = new Claim
+            {
+                LecturerName = "History Test",
+                HoursWorked = 25,
+                HourlyRate = 450,
+                SubmissionDate = DateTime.Now
+            };
+            await claimService.SubmitClaim(claim);
+            var submittedClaim = await context.Claims.FirstAsync();
+
+            // Coordinator approves
+            await claimService.ApproveClaim(submittedClaim.Id, "Coordinator", "First approval");
+
+            // Admin approves
+            await claimService.ApproveClaim(submittedClaim.Id, "Admin", "Final approval");
+
+            // Check history
+            var history = await claimService.GetClaimHistory(submittedClaim.Id);
+
+            Assert.NotNull(history);
+            Assert.True(history.Count >= 3); // At least: Submit, Coordinator Approve, Admin Approve
+            Assert.Contains(history, h => h.Action == "Submitted");
+            Assert.Contains(history, h => h.Action == "Coordinator Approved");
+            Assert.Contains(history, h => h.Action == "Admin Approved - Final");
+        }
+    }
+}
+
